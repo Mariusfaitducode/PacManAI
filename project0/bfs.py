@@ -67,9 +67,7 @@ class PacmanAgent(Agent):
         fringe.push((state, path))
         closed = set()
 
-
         while True:
-
             if fringe.isEmpty():
                 print("Fringe empty", path)
                 return path
@@ -92,11 +90,5 @@ class PacmanAgent(Agent):
                 print(action)
 
                 fringe.insert((successor, path + [action]))
-
-
-
-
-
-
 
         return path
