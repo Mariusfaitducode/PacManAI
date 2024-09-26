@@ -48,6 +48,10 @@ class Stack:
         "Push 'item' onto the stack"
         self.list.append(item)
 
+    def insert(self, item):
+
+        self.list.insert(0, item)
+
     def pop(self):
         "Pop the most recently pushed item from the stack"
         return self.list.pop()

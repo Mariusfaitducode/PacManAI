@@ -705,7 +705,7 @@ class Game:
             # Solicit an action
             action = None
             self.mute(agentIndex)
-            pacmodule.pacman.GameState.resetNodeExpansionCounter()
+            pacmodule.pacman.GameState.resetNodeExpansionCounter(self)
             violated = False
             t = time.time()
             if expout == 0:
