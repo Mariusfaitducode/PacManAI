@@ -13,10 +13,8 @@ def key(state):
     """
 
     return (
-
         state.getPacmanPosition(),
-        state.getCapsules(),
-        # ...
+        state.getFood(),
     )
 
 
@@ -38,22 +36,22 @@ class PacmanAgent(Agent):
             A legal move as defined in `game.Directions`.
         """
 
-        state_pos, capsules = key(state)
+        # state_pos, capsules = key(state)
 
-        if not capsules:
-            return Directions.STOP
+        # if not capsules:
+        #     return Directions.STOP
 
-        target = capsules[0]
+        # target = capsules[0]
 
         if self.moves is None:
-            self.moves = self.bfs(state, target)
+            self.moves = self.bfs(state)
 
         if self.moves:
             return self.moves.pop(0)
         else:
             return Directions.STOP
 
-    def bfs(self, state, target):
+    def bfs(self, state):
         """Given a Pacman game state, returns a list of legal moves to solve
         the search layout.
 
@@ -82,11 +80,7 @@ class PacmanAgent(Agent):
                 print(path)
                 return path
 
-            current_key, _ = key(current)
-
-            if current_key == target:
-                print("FIND TARGET")
-                return path
+            current_key = key(current)
 
             if current_key in closed:
                 continue

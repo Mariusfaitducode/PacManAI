@@ -13,8 +13,9 @@ def key(state):
     """
 
     return (
+
         state.getPacmanPosition(),
-        # ...
+        state.getFood(),
     )
 
 
@@ -60,9 +61,15 @@ class PacmanAgent(Agent):
         fringe.push((state, path))
         closed = set()
 
+        maxIterations = 150
+
         while True:
+            # print(maxIterations)
+            # print(path)
+            # maxIterations -= 1
             if fringe.isEmpty():
-                return []
+                print("Fringe empty", path)
+                return path
 
             current, path = fringe.pop()
 
