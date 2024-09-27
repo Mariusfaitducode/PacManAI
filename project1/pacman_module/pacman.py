@@ -85,7 +85,7 @@ class GameState:
     # /!\ Otherwise, your project won't be graded
     countExpanded=0
     maximumExpanded = np.inf
-    def resetNodeExpansionCounter():
+    def resetNodeExpansionCounter(self):
         GameState.countExpanded=0
 
     def setMaximumExpanded(m):

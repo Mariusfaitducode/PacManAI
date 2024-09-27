@@ -14,7 +14,7 @@ def key(state):
 
     return (
         state.getPacmanPosition(),
-        # ...
+        state.getFood()
     )
 
 
@@ -37,15 +37,15 @@ class PacmanAgent(Agent):
         """
 
         if self.moves is None:
-            self.moves = self.dfs(state)
+            self.moves = self.astar(state)
 
         if self.moves:
             return self.moves.pop(0)
         else:
             return Directions.STOP
 
-    def heuristic(state):
-        return state.getNumFood()
+    # def heuristic(state):
+    #     return state.getNumFood()
     
     def astar(self, state):
         """Given a Pacman game state, returns a list of legal moves to solve
@@ -61,16 +61,16 @@ class PacmanAgent(Agent):
         path = []
         fringe = PriorityQueue()
         cost = len(path)
-        heuristic_score = self.heuristic(state)
+        heuristic_score = state.getNumFood()
         score = cost + heuristic_score
-        fringe.push((score, state, path))
+        fringe.push((state, path), score)
         closed = set()
 
         while True:
             if fringe.isEmpty(): 
-                return []
+                return path
 
-            current, path = fringe.pop()
+            priority, (current, path) = fringe.pop()
 
             if current.isWin():
                 return path
@@ -83,7 +83,7 @@ class PacmanAgent(Agent):
                 closed.add(current_key)
 
             for successor, action in current.generatePacmanSuccessors():
-                score = len(path) + 1 + self.heuristic(successor)
-                fringe.push((score, successor, path + [action]))
+                score = len(path) + 1 + successor.getNumFood()
+                fringe.push((successor, path + [action]), score)
 
         return path

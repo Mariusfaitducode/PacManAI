@@ -1,5 +1,5 @@
 from pacman_module.game import Agent, Directions
-from pacman_module.util import Stack
+from pacman_module.util import Queue
 
 
 def key(state):
@@ -63,7 +63,7 @@ class PacmanAgent(Agent):
         """
 
         path = []
-        fringe = Stack()
+        fringe = Queue()
         fringe.push((state, path))
         closed = set()
 
@@ -89,6 +89,6 @@ class PacmanAgent(Agent):
 
                 print(action)
 
-                fringe.insert((successor, path + [action]))
+                fringe.push((successor, path + [action]))
 
         return path
