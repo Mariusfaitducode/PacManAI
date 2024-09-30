@@ -1,5 +1,5 @@
 from pacman_module.game import Agent, Directions
-from pacman_module.util import Stack
+from pacman_module.util import Queue
 
 
 def key(state):
@@ -36,13 +36,6 @@ class PacmanAgent(Agent):
             A legal move as defined in `game.Directions`.
         """
 
-        # state_pos, capsules = key(state)
-
-        # if not capsules:
-        #     return Directions.STOP
-
-        # target = capsules[0]
-
         if self.moves is None:
             self.moves = self.bfs(state)
 
@@ -63,19 +56,17 @@ class PacmanAgent(Agent):
         """
 
         path = []
-        fringe = Stack()
+        fringe = Queue()
         fringe.push((state, path))
         closed = set()
 
         while True:
             if fringe.isEmpty():
-                print("Fringe empty", path)
                 return path
 
             current, path = fringe.pop()
 
             if current.isWin():
-                print(path)
                 return path
 
             current_key = key(current)
@@ -86,9 +77,6 @@ class PacmanAgent(Agent):
                 closed.add(current_key)
 
             for successor, action in current.generatePacmanSuccessors():
-
-                print(action)
-
-                fringe.insert((successor, path + [action]))
+                fringe.push((successor, path + [action]))
 
         return path
