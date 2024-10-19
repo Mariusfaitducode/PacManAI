@@ -38,7 +38,7 @@ class PacmanAgent(Agent):
         print(f"RSS (Resident Set Size): {memory_info.rss / 1024**2:.2f} MB")
         print(f"VMS (Virtual Memory Size): {memory_info.vms / 1024**2:.2f} MB")
 
-        return self.minimax(state, 1, 12, -np.inf, +np.inf)[1]
+        return self.minimax(state, 1, 15, -np.inf, +np.inf)[1]
 
     @lru_cache(maxsize=4096)
     def minimax(self, state, maxPlayer:bool, maxDepth:int, alpha:float, beta:float):
@@ -57,18 +57,18 @@ class PacmanAgent(Agent):
                 - legal move as defined in `game.Directions`
         """
 
-        # Testing if the game is won or finished
-        if state.isWin():
-            return 1000 + state.getScore(), Directions.STOP
-
-        if state.isLose():
-            return -1000 + state.getScore(), Directions.STOP
-
-        if maxDepth < 0:
-            return state.getScore(), Directions.STOP
-
         # Move initially returned
         move = Directions.STOP
+
+        # Testing if the game is won or finished
+        if state.isWin():
+            return 1000 + state.getScore(), move
+
+        if state.isLose():
+            return -1000 + state.getScore(), move
+
+        if maxDepth < 0:
+            return state.getScore(), move
 
         # Case of the MAX player
         if maxPlayer:
