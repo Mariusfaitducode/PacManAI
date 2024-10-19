@@ -17,6 +17,7 @@ def key(state):
     return (
         state.getPacmanPosition(),
         state.getFood(),
+        tuple(state.getCapsules())
     )
 
 
@@ -68,7 +69,6 @@ class PacmanAgent(Agent):
         closeCapsules = 0
         for incY in [-1, 0, 1]:
             for incX in [-1, 0, 1]:
-                if state.hasFood(state.getPacmanPosition()[0] + incX, state.getPacmanPosition()[1] + incY):
                     closeCapsules += 1
 
         return eatenCapsules * 10 + state.getNumFood()
