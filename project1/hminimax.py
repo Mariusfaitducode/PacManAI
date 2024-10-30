@@ -2,18 +2,17 @@ import numpy as np
 
 from pacman_module.game import Agent, Directions
 from pacman_module.util import manhattanDistance
-from functools import lru_cache
 from itertools import combinations
 
 """
 +-----------------+-----------------+-----------------+-----------------+
 |  Scores         |  Small          |  Medium         |  Large          |
 +-----------------+-----------------+-----------------+-----------------+
-|  Dumby          |      516        |      539        |      534        |
+|  Dumby          |      516        |      539        |      536        |
 +-----------------+-----------------+-----------------+-----------------+
 |  Smarty         |      516        |      539        |      534        |
 +-----------------+-----------------+-----------------+-----------------+
-|  Greedy         |      516        |      539        |      536        |
+|  Greedy         |      516        |      539        |      534        |
 +-----------------+-----------------+-----------------+-----------------+
 
 
@@ -73,7 +72,7 @@ class PacmanAgent(Agent):
         return self.hminimax(state, 1, self.maxDepth, -np.inf,
                              +np.inf, state.getNumFood())[1]
 
-    def cutOff(self, state, maxDepth, nbfoodinit, distPacGhost):
+    def cutOff(self, state, maxDepth, nbfoodinit):
         """Evaluate if one of the cutoff conditions is met to stop recursion.
 
         Arguments:
@@ -91,7 +90,7 @@ class PacmanAgent(Agent):
                 nbfoodinit > state.getNumFood()):
             return True
 
-        elif distPacGhost > 4 and (self.maxDepth - maxDepth) > 3:
+        elif self.getPacmanGhostdist(state) > 4 and (self.maxDepth - maxDepth) > 3:
             return True
 
         else:
@@ -195,17 +194,16 @@ class PacmanAgent(Agent):
             return state.getScore() - 3.5 * distFoodMin - 2 * distPacFoodMin\
                     - 10 * state.getNumFood()
 
-    @lru_cache(maxsize=4096)
-    def hminimax(self, state, maxPlayer: bool, maxDepth: int, alpha: float, beta: float, nbfoodinit: int):
+    def hminimax(self, state, player: bool, maxDepth: int, alpha: float, beta: float, nbfoodinit: int):
         """Given a Pacman game state, returns the best possible move
             using hminimax with alpha-beta pruning.
 
             Arguments:
             state:      a game state. See API or class `pacman.GameState`.
-            maxPlayer:  boolean, 1 means its max's move, 0 means its min's move
+            player:     boolean, 1 means its max's move, 0 means its min's move
             maxDepth:   integer, maximum reachable depth of the search tree
-            alpha:      float, best minimum utility score in the current search tree
-            beta:       float, best maximum utility score in the current search tree
+            alpha:      float, the best minimum utility score in the current search tree
+            beta:       float, the best maximum utility score in the current search tree
             nbfoodinit: integer, number of food dots at the beginning of the game
 
             Returns:
@@ -214,14 +212,17 @@ class PacmanAgent(Agent):
                 - legal move as defined in `game.Directions`
         """
 
+        # Move initially returned
         move = Directions.STOP
 
-        distPacGhost = self.getPacmanGhostdist(state)
-
-        if self.cutOff(state, maxDepth, nbfoodinit, distPacGhost):
+        # Check cut-off conditions
+        if self.cutOff(state, maxDepth, nbfoodinit):
             return self.eval(state, maxDepth, nbfoodinit), move
 
-        currentKey = key(state, maxPlayer)
+        # Initial best score : -∞ for pacman, +∞ for ghost
+        best_score = -np.inf if player else +np.inf
+
+        currentKey = key(state, player)
 
         if currentKey in self.keyMap:
             inDepth = self.keyMap[currentKey]
@@ -229,46 +230,48 @@ class PacmanAgent(Agent):
             if inDepth > (self.maxDepth - maxDepth):
                 self.keyMap[currentKey] = self.maxDepth - maxDepth
             else:
-                if maxPlayer:
+                if player:
                     return 5000, Directions.STOP
                 return -5000, Directions.STOP
         else:
             self.keyMap[currentKey] = self.maxDepth - maxDepth
 
-        # Case of the MAX player (Pacman)
-        if maxPlayer:
-            rv_max = -np.inf
+        # Determine successors based on player
+        successors = (
+            state.generatePacmanSuccessors() if player
+            else state.generateGhostSuccessors(1)
+        )
 
-            for successor, action in state.generatePacmanSuccessors():
-                val = self.hminimax(successor, 0, maxDepth - 1, alpha,
-                                    beta, nbfoodinit)[0]
+        # Explore successor nodes
+        for successor, action in successors:
+            eval = self.hminimax(successor, not player, maxDepth - 1, alpha, beta, nbfoodinit)[0]
 
-                if val >= beta:
-                    return val, action
+            # Max player (pacman)
+            if player:
+                alpha_pruning = eval >= beta
+                better_score = eval > best_score
 
-                alpha = max(alpha, val)
-
-                if val > rv_max:
-                    rv_max = val
+                # Best score / best move update
+                if alpha_pruning or better_score:
+                    best_score = eval
                     move = action
 
-            return rv_max, move
+                # Alpha pruning
+                if alpha_pruning: break
+                alpha = max(alpha, eval)
 
-        # Case of the MIN player (Ghost)
-        else:
-            rv_min = np.inf
+            # Min player (ghost)
+            else:
+                beta_pruning = eval <= alpha
+                better_score = eval < best_score
 
-            for successor, action in state.generateGhostSuccessors(1):
-                val = self.hminimax(successor, 1, maxDepth - 1, alpha,
-                                    beta, nbfoodinit)[0]
-
-                if val <= alpha:
-                    return val, action
-
-                beta = min(beta, val)
-
-                if val < rv_min:
-                    rv_min = val
+                # Best score / best move update
+                if beta_pruning or better_score:
+                    best_score = eval
                     move = action
 
-            return rv_min, move
+                # Beta pruning
+                if beta_pruning: break
+                beta = min(beta, eval)
+
+        return best_score, move
