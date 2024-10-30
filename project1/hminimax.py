@@ -52,8 +52,8 @@ class PacmanAgent(Agent):
 
     def __init__(self):
         super().__init__()
-        self.keyMap = {}
-        self.maxDepth = 0
+        self.key_map = {}
+        self.max_depth = None
 
     def get_action(self, state):
         """Given a Pacman game state, returns a legal move.
@@ -65,32 +65,35 @@ class PacmanAgent(Agent):
             A legal move as defined in `game.Directions`.
         """
 
-        nbrFood = 2 * state.getNumFood()
+        self.max_depth = max(2, min(4, 2 * state.getNumFood()))
 
-        self.maxDepth = max(2, min(4, nbrFood))
+        return self.hminimax(
+            state=state,
+            player=1,
+            depth=0,
+            alpha=-np.inf,
+            beta=+np.inf,
+            nbfoodinit=state.getNumFood()
+        )[1]
 
-        return self.hminimax(state, 1, self.maxDepth, -np.inf,
-                             +np.inf, state.getNumFood())[1]
-
-    def cutOff(self, state, maxDepth, nbfoodinit):
+    def cutOff(self, state, depth, nbfoodinit):
         """Evaluate if one of the cutoff conditions is met to stop recursion.
 
         Arguments:
             state:          a game state. See API or class `pacman.GameState`.
-            maxDepth:       integer, maximum reachable depth of the search tree
+            depth:          integer, current depth of the search tree
             nbfoodinit:     integer, number of food dots at the beginning
                             of the game
-            distPacGhost:   integer, distance between Pacman and the ghost
 
         Returns:
             A boolean value.
         """
 
-        if (state.isWin() or state.isLose() or maxDepth < 0 or
+        if (state.isWin() or state.isLose() or depth > self.max_depth or
                 nbfoodinit > state.getNumFood()):
             return True
 
-        elif self.getPacmanGhostdist(state) > 4 and (self.maxDepth - maxDepth) > 3:
+        elif self.getPacmanGhostdist(state) > 4 and depth > 3:
             return True
 
         else:
@@ -152,13 +155,13 @@ class PacmanAgent(Agent):
 
         return minFoodDist
 
-    def eval(self, state, maxDepth, nbfoodinit):
+    def eval(self, state, depth, nbfoodinit):
         """Given a Pacman game state, returns an estimate of the
             expected utility of the game state.
 
             Arguments:
             state:          a game state. See API or class `pacman.GameState`.
-            maxDepth:       integer, maximum reachable depth of the search tree
+            depth:          integer, current depth of the search tree
             nbfoodinit:     integer, number of food dots at the beginning of
                             the game
 
@@ -173,10 +176,12 @@ class PacmanAgent(Agent):
             return -5000 + state.getScore()
 
         if nbfoodinit > state.getNumFood():
-            if self.maxDepth > (self.maxDepth - maxDepth):
-                self.depth_max = (self.maxDepth - maxDepth)
-            return (state.getScore() - (self.maxDepth - maxDepth)
-                    - 10 * state.getNumFood())
+            if self.max_depth > depth:
+                self.depth_max = depth
+            return (
+                    state.getScore() - depth
+                    - 10 * state.getNumFood()
+            )
 
         distFoodMin = self.getMinFoodDist(state)
         distPacFoodMin = self.getClosestFoodDist(state)
@@ -194,14 +199,14 @@ class PacmanAgent(Agent):
             return state.getScore() - 3.5 * distFoodMin - 2 * distPacFoodMin\
                     - 10 * state.getNumFood()
 
-    def hminimax(self, state, player: bool, maxDepth: int, alpha: float, beta: float, nbfoodinit: int):
+    def hminimax(self, state, player: bool, depth: int, alpha: float, beta: float, nbfoodinit: int):
         """Given a Pacman game state, returns the best possible move
             using hminimax with alpha-beta pruning.
 
             Arguments:
             state:      a game state. See API or class `pacman.GameState`.
             player:     boolean, 1 means its max's move, 0 means its min's move
-            maxDepth:   integer, maximum reachable depth of the search tree
+            depth:      integer, current depth of the search tree
             alpha:      float, the best minimum utility score in the current search tree
             beta:       float, the best maximum utility score in the current search tree
             nbfoodinit: integer, number of food dots at the beginning of the game
@@ -216,25 +221,25 @@ class PacmanAgent(Agent):
         move = Directions.STOP
 
         # Check cut-off conditions
-        if self.cutOff(state, maxDepth, nbfoodinit):
-            return self.eval(state, maxDepth, nbfoodinit), move
+        if self.cutOff(state, depth, nbfoodinit):
+            return self.eval(state, depth, nbfoodinit), move
 
         # Initial best score : -∞ for pacman, +∞ for ghost
         best_score = -np.inf if player else +np.inf
 
         currentKey = key(state, player)
 
-        if currentKey in self.keyMap:
-            inDepth = self.keyMap[currentKey]
+        if currentKey in self.key_map:
+            inDepth = self.key_map[currentKey]
 
-            if inDepth > (self.maxDepth - maxDepth):
-                self.keyMap[currentKey] = self.maxDepth - maxDepth
+            if inDepth > depth:
+                self.key_map[currentKey] = depth
             else:
                 if player:
                     return 5000, Directions.STOP
                 return -5000, Directions.STOP
         else:
-            self.keyMap[currentKey] = self.maxDepth - maxDepth
+            self.key_map[currentKey] = depth
 
         # Determine successors based on player
         successors = (
@@ -244,7 +249,7 @@ class PacmanAgent(Agent):
 
         # Explore successor nodes
         for successor, action in successors:
-            eval = self.hminimax(successor, not player, maxDepth - 1, alpha, beta, nbfoodinit)[0]
+            eval = self.hminimax(successor, not player, depth + 1, alpha, beta, nbfoodinit)[0]
 
             # Max player (pacman)
             if player:
