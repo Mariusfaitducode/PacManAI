@@ -1,6 +1,4 @@
 import numpy as np
-import psutil
-import os
 
 from pacman_module.game import Agent, Directions
 from pacman_module.util import manhattanDistance
@@ -67,22 +65,6 @@ class PacmanAgent(Agent):
         Returns:
             A legal move as defined in `game.Directions`.
         """
-
-        # Consider Pacman as MAX player
-        cache_info = self.hminimax.cache_info()
-
-        # Memory usage
-        process = psutil.Process(os.getpid())
-        memory_info = process.memory_info()
-
-        print("Cache Stats:")
-        print(f"Hits: {cache_info.hits}")
-        print(f"Misses: {cache_info.misses}")
-        print(f"Current Cache Size: {cache_info.currsize}")
-
-        print("\nMemory Usage:")
-        print(f"RSS (Resident Set Size): {memory_info.rss / 1024**2:.2f} MB")
-        print(f"VMS (Virtual Memory Size): {memory_info.vms / 1024**2:.2f} MB")
 
         nbrFood = 2 * state.getNumFood()
 

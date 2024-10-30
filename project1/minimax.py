@@ -37,6 +37,7 @@ class PacmanAgent(Agent):
             depth:      integer, maximum reachable depth of the search tree
             alpha:      float, the best minimum utility score in the current search tree
             beta:       float, the best maximum utility score in the current search tree
+            _explored:  set of already explored states in the current node, prevents cycles
 
         Returns:
             2-tuple:
