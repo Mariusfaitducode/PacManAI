@@ -27,7 +27,6 @@ from itertools import combinations
 +-----------------+-----------------+-----------------+-----------------+
 """
 
-
 def key(state, maxPlayer):
     """Returns a key that uniquely identifies a Pacman game state.
 
@@ -72,32 +71,25 @@ class PacmanAgent(Agent):
             player=1,
             depth=0,
             alpha=-np.inf,
-            beta=+np.inf,
-            nbfoodinit=state.getNumFood()
+            beta=+np.inf
         )[1]
 
-    def cutOff(self, state, depth, nbfoodinit):
+    def cutOff(self, state, depth):
         """Evaluate if one of the cutoff conditions is met to stop recursion.
 
         Arguments:
             state:          a game state. See API or class `pacman.GameState`.
             depth:          integer, current depth of the search tree
-            nbfoodinit:     integer, number of food dots at the beginning
-                            of the game
 
         Returns:
             A boolean value.
         """
-
-        if (state.isWin() or state.isLose() or depth > self.max_depth or
-                nbfoodinit > state.getNumFood()):
-            return True
-
-        elif self.getPacmanGhostdist(state) > 4 and depth > 3:
-            return True
-
-        else:
-            return False
+        return (
+            state.isWin()
+            or state.isLose()
+            or depth > self.max_depth
+            or self.getPacmanGhostdist(state) > 4 and depth > 3
+        )
 
     def getPacmanGhostdist(self, state):
         """Given a Pacman game state, returns the distance between Pacman
@@ -155,15 +147,13 @@ class PacmanAgent(Agent):
 
         return minFoodDist
 
-    def eval(self, state, depth, nbfoodinit):
+    def eval(self, state, depth):
         """Given a Pacman game state, returns an estimate of the
             expected utility of the game state.
 
             Arguments:
             state:          a game state. See API or class `pacman.GameState`.
             depth:          integer, current depth of the search tree
-            nbfoodinit:     integer, number of food dots at the beginning of
-                            the game
 
             Returns:
             A int.
@@ -175,13 +165,13 @@ class PacmanAgent(Agent):
         if state.isLose():
             return -5000 + state.getScore()
 
-        if nbfoodinit > state.getNumFood():
-            if self.max_depth > depth:
-                self.depth_max = depth
-            return (
-                    state.getScore() - depth
-                    - 10 * state.getNumFood()
-            )
+        # if nbfoodinit > state.getNumFood():
+        #     if self.max_depth > depth:
+        #         self.depth_max = depth
+        #     return (
+        #             state.getScore() - depth
+        #             - 10 * state.getNumFood()
+        #     )
 
         distFoodMin = self.getMinFoodDist(state)
         distPacFoodMin = self.getClosestFoodDist(state)
@@ -199,7 +189,7 @@ class PacmanAgent(Agent):
             return state.getScore() - 3.5 * distFoodMin - 2 * distPacFoodMin\
                     - 10 * state.getNumFood()
 
-    def hminimax(self, state, player: bool, depth: int, alpha: float, beta: float, nbfoodinit: int):
+    def hminimax(self, state, player: bool, depth: int, alpha: float, beta: float):
         """Given a Pacman game state, returns the best possible move
             using hminimax with alpha-beta pruning.
 
@@ -209,7 +199,6 @@ class PacmanAgent(Agent):
             depth:      integer, current depth of the search tree
             alpha:      float, the best minimum utility score in the current search tree
             beta:       float, the best maximum utility score in the current search tree
-            nbfoodinit: integer, number of food dots at the beginning of the game
 
             Returns:
             tuple of 4 elements
@@ -221,8 +210,8 @@ class PacmanAgent(Agent):
         move = Directions.STOP
 
         # Check cut-off conditions
-        if self.cutOff(state, depth, nbfoodinit):
-            return self.eval(state, depth, nbfoodinit), move
+        if self.cutOff(state, depth):
+            return self.eval(state, depth), move
 
         # Initial best score : -∞ for pacman, +∞ for ghost
         best_score = -np.inf if player else +np.inf
@@ -249,7 +238,7 @@ class PacmanAgent(Agent):
 
         # Explore successor nodes
         for successor, action in successors:
-            eval = self.hminimax(successor, not player, depth + 1, alpha, beta, nbfoodinit)[0]
+            eval = self.hminimax(successor, not player, depth + 1, alpha, beta)[0]
 
             # Max player (pacman)
             if player:
