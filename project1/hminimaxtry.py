@@ -4,6 +4,7 @@ from pacman_module.game import Agent, Directions
 from pacman_module.util import manhattanDistance
 from itertools import combinations
 
+
 def key(state, maxPlayer):
     """Returns a key that uniquely identifies a Pacman game state.
 
@@ -32,7 +33,8 @@ def get_extreme_foods(state):
     extreme_foods = [pacman_position for _ in range(4)]
     for i in range(food_positions.width):
         for j in range(food_positions.height):
-            if not food_positions[i][j]: continue
+            if not food_positions[i][j]:
+                continue
             if i < extreme_foods[0][0]:
                 extreme_foods[0] = (i, j)
             if i > extreme_foods[1][0]:
@@ -43,14 +45,28 @@ def get_extreme_foods(state):
                 extreme_foods[3] = (i, j)
     return extreme_foods
 
-import numpy as np
 
 def floyd_warshall(state):
+    """Given a Pacman game state, return a matrix representing
+        the shortest distances between all pairs of empty cells
+        and a dictionary mapping each cell to its index in the matrix.
+
+        Arguments:
+        state: a game state. See API or class `pacman.GameState`.
+
+        returns:
+        - dist:             a numpy array representing the shortest
+                            distances between all pairs of empty cells.
+        - cell_to_index:    a dictionary mapping each cell to itsindex
+                            in the matrix.
+    """
     walls_Pos = state.getWalls()
     rows, cols = walls_Pos.width, walls_Pos.height
 
     # Want to ONLY keep cells without walls
-    open_cells = [(x, y) for x in range(rows) for y in range(cols) if not walls_Pos[x][y]]
+    open_cells = [(x, y) for x in range(rows) for y in range(cols)
+                  if not walls_Pos[x][y]]
+
     # Number of "empty" cells
     nbr_empty_cells = len(open_cells)
     # Dictionnary from the mapping from cell to index
@@ -65,9 +81,10 @@ def floyd_warshall(state):
     # Check which empty cells are directly adjacent/reachable to each other
     for (x, y) in open_cells:
         current_cell_id = cell_to_index[(x, y)]
+        # Check if the neighbors are empty cells
         for x_neighb, y_neighb in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nx, ny = x + x_neighb, y + y_neighb
-            if (nx, ny) in cell_to_index:  # Check if neighbor is also an open cell
+            if (nx, ny) in cell_to_index:
                 neighbor_cell_id = cell_to_index[(nx, ny)]
                 # The adjacency matrix is symmetric
                 dist[current_cell_id][neighbor_cell_id] = 1
@@ -82,7 +99,6 @@ def floyd_warshall(state):
     return dist, cell_to_index
 
 
-
 def floyd_marshall_distance(state):
     extreme_foods = get_extreme_foods(state)
 
@@ -95,24 +111,28 @@ def floyd_marshall_distance(state):
             for j in {0, i}
         ]
         max_index = dist.index(max(dist))
-        extreme_foods[i], extreme_foods[max_index] = extreme_foods[max_index], extreme_foods[i]
+        extreme_foods[i], extreme_foods[max_index] =\
+            extreme_foods[max_index], extreme_foods[i]
         current_pos = extreme_foods[i]
         heuristic += min(dist)
 
     return heuristic
 
-def closest_food(state, dist,cell_to_index):
+
+def closest_food(state, dist, cell_to_index):
     # Get pacman position
     pacman_Pos = state.getPacmanPosition()
     # Get the food positions
     food_Pos = state.getFood().asList()
 
-    if not food_Pos: return 0
+    if not food_Pos:
+        return 0
 
     # Get the index of the Pacman position in the distance matrix
     pacman_index = cell_to_index[pacman_Pos]
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if food in cell_to_index]
+    food_indices = [cell_to_index[food] for food in food_Pos
+                    if food in cell_to_index]
 
     food_dist_list = []
     food_pos_list = []
@@ -125,21 +145,23 @@ def closest_food(state, dist,cell_to_index):
     nearest_food_Pos = food_pos_list[food_dist_list.index(nearest_food_dist)]
     return nearest_food_dist, nearest_food_Pos
 
+
 def food_score(state, dist, cell_to_index):
     food_Pos = state.getFood().asList()
 
     nearestFood, nearestFoodPosition = closest_food(state, dist, cell_to_index)
     foodScore = 1 / nearestFood
-    
+
     # Remove the nearest food
     food_Pos.remove(nearestFoodPosition[0])
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if food in cell_to_index]
-
+    food_indices = [cell_to_index[food] for food in food_Pos
+                    if food in cell_to_index]
 
     for food_index in food_indices:
         foodScore += 1/dist[cell_to_index[nearestFoodPosition[0]]][food_index]
     return foodScore
+
 
 def wall_score(state):
     score = 0
@@ -155,35 +177,55 @@ def wall_score(state):
                     score += 1/dist
     return score
 
+
 def ghost_score(state, dist, cell_to_index):
     return 1/ghost_dist(state, dist, cell_to_index)
 
 
 def closest_food_Pac_dist(state, dist, cell_to_index):
+    """Given a Pacman game state a matrix representing the distance
+        between each pair of empty cells, and a dictionary mapping each
+        returns the distance between Pacman and the closest food.
 
+    Arguments:
+        state: a game state. See API or class `pacman.GameState`.
+        dist: a numpy array representing the shortest distances between
+                all pairs of empty cells.
+        cell_to_index: a dictionary mapping each cell to its index in the
+                        dist matrix.
+
+    Returns:
+        A int.
+    """
     # Get pacman position
     pacman_Pos = state.getPacmanPosition()
     # Get the food positions
     food_Pos = state.getFood().asList()
 
-    if not food_Pos: return 0
+    if not food_Pos:
+        return 0
 
     # Get the index of the Pacman position in the distance matrix
     pacman_index = cell_to_index[pacman_Pos]
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if food in cell_to_index]
+    food_indices = [cell_to_index[food] for food in food_Pos if
+                    food in cell_to_index]
 
-    return min(
-       dist[pacman_index][food_index]
-        for food_index in food_indices
-    )
+    return min(dist[pacman_index][food_index] for food_index
+               in food_indices)
+
 
 def ghost_dist(state, dist, cell_to_index):
-    """Given a Pacman game state, returns the distance between Pacman
-    and the ghost.
+    """Given a Pacman game state a matrix representing the distance
+        between each pair of empty cells, and a dictionary mapping each
+        returns the distance between Pacman and the ghost.
 
     Arguments:
         state: a game state. See API or class `pacman.GameState`.
+        dist: a numpy array representing the shortest distances between
+                all pairs of empty cells.
+        cell_to_index: a dictionary mapping each cell to its index in the
+                        dist matrix.
 
     Returns:
         A int.
@@ -200,18 +242,34 @@ def ghost_dist(state, dist, cell_to_index):
 
     return dist[pacman_index][ghost_index]
 
+
 def min_inter_food_dist(state, dist, cell_to_index):
-    """
-    Return the minimum distance between all food pairs in the state using Floyd-Warshall distances.
+    """ Given a Pacman game state a matrix representing the distance
+        between each pair of empty cells, and a dictionary mapping each
+        returns the distance between the two furthest food cells and
+        their corresponding indexes in the distance matrix.
+
+        Arguments:
+        state: a game state. See API or class `pacman.GameState`.
+        dist: a numpy array representing the shortest distances between
+                all pairs of empty cells.
+        cell_to_index: a dictionary mapping each cell to its index in the
+                        dist matrix.
+
+        Returns:
+        max_dist: the maximum distance between any two food cells.
+        f1_index: the index of the first food cell in the distance matrix.
+        f2_index: the index of the second food cell in the distance matrix.
     """
     food_Pos = state.getFood().asList()
 
-    # If less than 2 food pts, min_dist = 0. 
+    # If less than 2 food pts, min_dist = 0
     if len(food_Pos) < 2:
         return 0
 
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if food in cell_to_index]
+    food_indices = [cell_to_index[food] for food in food_Pos if
+                    food in cell_to_index]
 
     # Find the minimum distance between any two foods
     min_dist = np.inf
@@ -222,24 +280,40 @@ def min_inter_food_dist(state, dist, cell_to_index):
 
     return min_distance
 
+
 def max_inter_food_dist(state, dist, cell_to_index):
-    """
-    Return the minimum distance between all food pairs in the state using Floyd-Warshall distances.
+    """ Given a Pacman game state a matrix representing the distance
+        between each pair of empty cells, and a dictionary mapping each
+        returns the distance between the two furthest food cells and
+        their corresponding indexes in the distance matrix.
+
+        Arguments:
+        state: a game state. See API or class `pacman.GameState`.
+        dist: a numpy array representing the shortest distances between
+                all pairs of empty cells.
+        cell_to_index: a dictionary mapping each cell to its index in the
+                        dsit matrix.
+
+        returns:
+        max_dist: the maximum distance between any two food cells.
+        f1_index: the index of the first food cell in the distance matrix.
+        f2_index: the index of the second food cell in the distance matrix.
     """
     food_Pos = state.getFood().asList()
 
-    # If less than 2 food pts, min_dist = 0. 
+    # If less than 2 food pts, min_dist = 0
     if len(food_Pos) < 2:
         return 0, 0, 0
 
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if food in cell_to_index]
+    food_indices = [cell_to_index[food] for food in food_Pos if
+                    food in cell_to_index]
 
     max_dist = - np.inf
     f1_index = -1
     f2_index = -1
 
-    # Find the minimum distance between any two foods
+    # Find the maximum distance between any two foods
     for f1, f2 in combinations(food_indices, 2):
         distance = dist[f1][f2]
         if distance > max_dist:
@@ -247,7 +321,8 @@ def max_inter_food_dist(state, dist, cell_to_index):
             f2_index = f2
             max_distance = distance
 
-    # Return the maximum distance and the index of the corresponding food points
+    # Return the maximum distance and the index of the corresponding
+    # food points
     return max_distance, f1_index, f2_index
 
 
@@ -280,15 +355,14 @@ class PacmanAgent(Agent):
             player=1,
             depth=0,
             alpha=-np.inf,
-            beta=+np.inf
-        )[1]
-    
+            beta=+np.inf)[1]
+
     def cutOff(self, state, depth):
         """Evaluate if one of the cutoff conditions is met to stop recursion.
 
         Arguments:
-            state:          a game state. See API or class `pacman.GameState`.
-            depth:          integer, current depth of the search tree
+            state:  a game state. See API or class `pacman.GameState`.
+            depth:  integer, current depth of the search tree
 
         Returns:
             A boolean value.
@@ -297,29 +371,43 @@ class PacmanAgent(Agent):
             state.isWin()
             or state.isLose()
             or depth > self.max_depth
-            or ghost_dist(state, self.dist, self.cell_to_index) > 4 and depth > 3
+            or ghost_dist(state, self.dist, self.cell_to_index) > 4
+            and depth > 3
         )
 
     def eval(self, state):
+        """Given a Pacman game state, returns an estimate of the
+            expected utility of the game state.
 
-        # -------- General end state score --------
-        if state.isWin(): return 5000 + state.getScore()
-        if state.isLose(): return -5000 + state.getScore()
+            Arguments:
+            state: a game state. See API or class `pacman.GameState`.
+
+            Returns:
+            A int.
+        """
+        if state.isWin():
+            return 5000 + state.getScore()
+
+        if state.isLose():
+            return -5000 + state.getScore()
 
         pacman_Pos = state.getPacmanPosition()
         pacman_index = self.cell_to_index[pacman_Pos]
 
-        if(len(state.getFood().asList()) == 0):
+        if (len(state.getFood().asList()) == 0):
             dist_food_max = 0
             min_dist = 0
         else:
-            dist_food_max, f1, f2 = max_inter_food_dist(state, self.dist, self.cell_to_index)
-            min_dist = min(self.dist[pacman_index][f1],self.dist[pacman_index][f2])
+            dist_food_max, f1, f2 =\
+                max_inter_food_dist(state, self.dist, self.cell_to_index)
+            min_dist = min(self.dist[pacman_index][f1],
+                           self.dist[pacman_index][f2])
 
-        dist_pac_food_min = closest_food_Pac_dist(state, self.dist,self.cell_to_index)
+        dist_pac_food_min =\
+            closest_food_Pac_dist(state, self.dist, self.cell_to_index)
 
-        return state.getScore() -  1*(dist_food_max + min_dist) - 2*dist_pac_food_min \
-            - 10 * state.getNumFood()
+        return state.getScore() - 1 * (dist_food_max + min_dist)\
+            - 2 * dist_pac_food_min - 10 * state.getNumFood()
 
         # Provide sometimes better results but les robust
         # return state.getScore() -  1*(dist_food_max + min_dist) - 2*dist_pac_food_min \
@@ -327,17 +415,19 @@ class PacmanAgent(Agent):
         #     food_score(state, self.dist, self.cell_to_index) - 1 *\
         #             ghost_score(state, self.dist, self.cell_to_index)
 
-
-    def hminimax(self, state, player: bool, depth: int, alpha: float, beta: float):
+    def hminimax(self, state, player: bool, depth: int, alpha: float,
+                 beta: float):
         """Given a Pacman game state, returns the best possible move
             using hminimax with alpha-beta pruning.
 
             Arguments:
-            state:      a game state. See API or class `pacman.GameState`.
-            player:     boolean, 1 means its max's move, 0 means its min's move
-            depth:      integer, current depth of the search tree
-            alpha:      float, the best minimum utility score in the current search tree
-            beta:       float, the best maximum utility score in the current search tree
+            state:     a game state. See API or class `pacman.GameState`.
+            player:    boolean, 1 means its max's move, 0 means its min's move
+            depth:     integer, current depth of the search tree
+            alpha:     float, the best minimum utility score in the current
+                       search tree
+            beta:      float, the best maximum utility score in the current
+                       search tree
 
             Returns:
             tuple of 4 elements
@@ -378,7 +468,8 @@ class PacmanAgent(Agent):
         # Explore successor nodes
         for successor, action in successors:
             # Evaluate next state with of other agent
-            eval = self.hminimax(successor, not player, depth + 1, alpha, beta)[0]
+            eval = self.hminimax(successor, not player, depth + 1,
+                                 alpha, beta)[0]
 
             # Max player (pacman)
             if player:
@@ -391,7 +482,8 @@ class PacmanAgent(Agent):
                     move = action
 
                 # Alpha pruning
-                if alpha_pruning: break
+                if alpha_pruning:
+                    break
                 alpha = max(alpha, eval)
 
             # Min player (ghost)
@@ -405,7 +497,8 @@ class PacmanAgent(Agent):
                     move = action
 
                 # Beta pruning
-                if beta_pruning: break
+                if beta_pruning:
+                    break
                 beta = min(beta, eval)
 
         return best_score, move

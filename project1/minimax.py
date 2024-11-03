@@ -1,12 +1,14 @@
 import numpy as np
 from pacman_module.game import Agent, Directions
 
+
 def key(state):
     return (
         state.getPacmanPosition(),
         tuple(state.getGhostStates()),
         state.getFood()
     )
+
 
 class PacmanAgent(Agent):
     """Empty Pacman agent based on minimax."""
@@ -28,16 +30,22 @@ class PacmanAgent(Agent):
         # Consider Pacman as MAX player
         return self.minimax(state, True, 12, -np.inf, +np.inf, set())[1]
 
-    def minimax(self, state, player: bool, depth: int, alpha: float, beta: float, _explored: set):
+    def minimax(self, state, player: bool, depth: int, alpha: float,
+                beta: float, _explored: set):
         """Given a Pacman game state, returns a legal move.
 
         Arguments:
-            state:      a game state. See API or class `pacman.GameState`.
-            player:     int, 1 means its max's move (pacman), 0 means its min's move (ghost)
+            state:      a game state. See API or class
+                        `pacman.GameState`.
+            player:     int, 1 means its max's move (pacman),
+                        0 means its min's move (ghost)
             depth:      integer, maximum reachable depth of the search tree
-            alpha:      float, the best minimum utility score in the current search tree
-            beta:       float, the best maximum utility score in the current search tree
-            _explored:  set of already explored states in the current node, prevents cycles
+            alpha:      float, the best minimum utility score in the current
+                        search tree
+            beta:       float, the best maximum utility score in the current
+                        search tree
+            _explored:  set of already explored states in the current node,
+                        prevents cycles
 
         Returns:
             2-tuple:
@@ -77,9 +85,11 @@ class PacmanAgent(Agent):
         # Explore successor nodes
         for successor, action in successors:
             # Check if successor is already explored
-            if key(successor) in explored: continue
+            if key(successor) in explored:
+                continue
 
-            eval = self.minimax(successor, not player, depth - 1, alpha, beta, explored)[0]
+            eval = self.minimax(successor, not player, depth - 1,
+                                alpha, beta, explored)[0]
 
             # Max player (pacman)
             if player:
@@ -92,7 +102,9 @@ class PacmanAgent(Agent):
                     move = action
 
                 # Alpha pruning
-                if alpha_pruning: break
+                if alpha_pruning:
+                    break
+
                 alpha = max(alpha, eval)
 
             # Min player (ghost)
@@ -106,7 +118,9 @@ class PacmanAgent(Agent):
                     move = action
 
                 # Beta pruning
-                if beta_pruning: break
+                if beta_pruning:
+                    break
+
                 beta = min(beta, eval)
 
         # Adding entry in transposition table
