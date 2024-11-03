@@ -16,6 +16,7 @@ class PacmanAgent(Agent):
     def __init__(self):
         super().__init__()
         self.cache = dict()
+        self.max_depth = None
 
     def get_action(self, state):
         """Given a Pacman game state, returns a legal move.
@@ -27,10 +28,16 @@ class PacmanAgent(Agent):
             A legal move as defined in `game.Directions`.
         """
 
-        # Consider Pacman as MAX player
-        return self.minimax(state, True, 12, -np.inf, +np.inf, set())[1]
+        # Automatic max depth estimation, using the game size
+        if self.max_depth is None:
+            self.max_depth = np.ceil(
+                np.log(state.getWalls().width * state.getWalls().height)
+                / np.log(4)
+            )
 
-    def minimax(self, state, player: bool, depth: int, alpha: float,
+        return self.minimax(state, 1, 4, -np.inf, +np.inf, set())[1]
+
+    def minimax(self, state, player: int, depth: int, alpha: float,
                 beta: float, _explored: set):
         """Given a Pacman game state, returns a legal move.
 
@@ -52,18 +59,20 @@ class PacmanAgent(Agent):
                 utility score of the current state
                 legal move as defined in `game.Directions`
         """
-
-        # Move initially returned
-        move = Directions.STOP
-
         # Check game end
         if state.isWin() or state.isLose():
-            return state.getScore(), move
+            return state.getScore(), None
 
         # Check transposition table
         state_key = key(state)
         if (state_key, state.getScore()) in self.cache:
             return self.cache[(state_key, state.getScore())]
+
+        # Move initially returned
+        move = Directions.STOP
+
+        if depth < 0:
+            return state.getScore(), move
 
         # Check cut-off condition
         if depth < 0:
@@ -85,7 +94,7 @@ class PacmanAgent(Agent):
         # Explore successor nodes
         for successor, action in successors:
             # Check if successor is already explored
-            if key(successor) in explored:
+            if key(successor) in _explored:
                 continue
 
             eval = self.minimax(successor, not player, depth - 1,
@@ -93,35 +102,27 @@ class PacmanAgent(Agent):
 
             # Max player (pacman)
             if player:
-                alpha_pruning = eval >= beta
-                better_score = eval > best_score
-
                 # Best score / best move update
-                if alpha_pruning or better_score:
+                if eval > best_score:
                     best_score = eval
                     move = action
 
                 # Alpha pruning
-                if alpha_pruning:
+                if best_score >= beta:
                     break
-
-                alpha = max(alpha, eval)
+                alpha = max(alpha, best_score)
 
             # Min player (ghost)
             else:
-                beta_pruning = eval <= alpha
-                better_score = eval < best_score
-
                 # Best score / best move update
-                if beta_pruning or better_score:
+                if eval < best_score:
                     best_score = eval
                     move = action
 
                 # Beta pruning
-                if beta_pruning:
+                if best_score <= alpha:
                     break
-
-                beta = min(beta, eval)
+                beta = min(beta, best_score)
 
         # Adding entry in transposition table
         self.cache[(state_key, state.getScore())] = (best_score, move)
