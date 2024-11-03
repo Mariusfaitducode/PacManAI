@@ -56,20 +56,20 @@ def floyd_warshall(state):
         returns:
         - dist:             a numpy array representing the shortest
                             distances between all pairs of empty cells.
-        - cell_to_index:    a dictionary mapping each cell to itsindex
+        - cell_to_index:    a dictionary mapping each cell to its index
                             in the matrix.
     """
-    walls_Pos = state.getWalls()
-    rows, cols = walls_Pos.width, walls_Pos.height
+    walls_pos = state.getWalls()
+    rows, cols = walls_pos.width, walls_pos.height
 
     # Want to ONLY keep cells without walls
     open_cells = [(x, y) for x in range(rows) for y in range(cols)
-                  if not walls_Pos[x][y]]
+                  if not walls_pos[x][y]]
 
     # Number of "empty" cells
     nbr_empty_cells = len(open_cells)
-    # Dictionnary from the mapping from cell to index
-    cell_to_index = {cell: id for id, cell in enumerate(open_cells)}
+    # Dictionary from the mapping from cell to index
+    cell_to_index = {cell: index for index, cell in enumerate(open_cells)}
 
     dist = np.full((nbr_empty_cells, nbr_empty_cells), np.inf)
 
@@ -81,15 +81,15 @@ def floyd_warshall(state):
     for (x, y) in open_cells:
         current_cell_id = cell_to_index[(x, y)]
         # Check if the neighbors are empty cells
-        for x_neighb, y_neighb in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + x_neighb, y + y_neighb
+        for x_inc, y_inc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + x_inc, y + y_inc
             if (nx, ny) in cell_to_index:
                 neighbor_cell_id = cell_to_index[(nx, ny)]
                 # The adjacency matrix is symmetric
                 dist[current_cell_id][neighbor_cell_id] = 1
                 dist[neighbor_cell_id][current_cell_id] = 1
 
-    # Floyd-Warshall algorithm to compute shortest real paths between empty
+    # Floyd-Warshall algorithm to compute the shortest real paths between empty
     for k in range(nbr_empty_cells):
         for i in range(nbr_empty_cells):
             for j in range(nbr_empty_cells):
@@ -142,35 +142,33 @@ def closest_food(state, dist, cell_to_index):
         food_pos_list.append([food_pos[pos]])
     nearest_food_dist = min(food_dist_list)
 
-    nearest_food_Pos = food_pos_list[food_dist_list.index(nearest_food_dist)]
-    return nearest_food_dist, nearest_food_Pos
+    nearest_food_pos = food_pos_list[food_dist_list.index(nearest_food_dist)]
+    return nearest_food_dist, nearest_food_pos
 
 
 def food_score(state, dist, cell_to_index):
-    food_Pos = state.getFood().asList()
+    food_pos = state.getFood().asList()
 
-    nearestFood, nearestFoodPosition = closest_food(state, dist, cell_to_index)
-    foodScore = 1 / nearestFood
+    nearest_food, nearest_food_position = closest_food(state, dist, cell_to_index)
+    food_score = 1 / nearest_food
 
     # Remove the nearest food
-    food_Pos.remove(nearestFoodPosition[0])
+    food_pos.remove(nearest_food_position[0])
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos
+    food_indices = [cell_to_index[food] for food in food_pos
                     if food in cell_to_index]
 
     for food_index in food_indices:
-        foodScore += 1/dist[cell_to_index[nearestFoodPosition[0]]][food_index]
-    return foodScore
+        food_score += 1/dist[cell_to_index[nearest_food_position[0]]][food_index]
+    return food_score
 
 
 def wall_score(state):
     score = 0
     wall = state.getWalls()
-    W = wall.width
-    H = wall.height
     position = state.getPacmanPosition()
-    for w in range(W):
-        for h in range(H):
+    for w in range(wall.width):
+        for h in range(wall.height):
             dist = manhattanDistance((w, h), position)
             if w != 1 or h != 1:
                 if wall[w][h]:
@@ -198,17 +196,17 @@ def closest_food_dist(state, dist, cell_to_index):
         A int.
     """
     # Get pacman position
-    pacman_Pos = state.getPacmanPosition()
+    pacman_pos = state.getPacmanPosition()
     # Get the food positions
-    food_Pos = state.getFood().asList()
+    food_pos = state.getFood().asList()
 
-    if not food_Pos:
+    if not food_pos:
         return 0
 
     # Get the index of the Pacman position in the distance matrix
-    pacman_index = cell_to_index[pacman_Pos]
+    pacman_index = cell_to_index[pacman_pos]
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if
+    food_indices = [cell_to_index[food] for food in food_pos if
                     food in cell_to_index]
 
     return min(dist[pacman_index][food_index] for food_index
@@ -231,14 +229,14 @@ def ghost_dist(state, dist, cell_to_index):
         A int.
     """
     # Get Pacman position
-    pacman_Pos = state.getPacmanPosition()
+    pacman_pos = state.getPacmanPosition()
     # Get the corresponding index in the distance matrix
-    pacman_index = cell_to_index[pacman_Pos]
+    pacman_index = cell_to_index[pacman_pos]
 
     # Get the ghost position
-    ghost_Pos = state.getGhostPosition(1)
+    ghost_pos = state.getGhostPosition(1)
     # Get the corresponding index in the distance matrix
-    ghost_index = cell_to_index[ghost_Pos]
+    ghost_index = cell_to_index[ghost_pos]
 
     return dist[pacman_index][ghost_index]
 
@@ -261,14 +259,14 @@ def min_inter_food_dist(state, dist, cell_to_index):
         f1_index: the index of the first food cell in the distance matrix.
         f2_index: the index of the second food cell in the distance matrix.
     """
-    food_Pos = state.getFood().asList()
+    food_pos = state.getFood().asList()
 
     # If less than 2 food pts, min_dist = 0
-    if len(food_Pos) < 2:
+    if len(food_pos) < 2:
         return 0
 
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if
+    food_indices = [cell_to_index[food] for food in food_pos if
                     food in cell_to_index]
 
     # Find the minimum distance between any two foods
@@ -292,21 +290,21 @@ def max_inter_food_dist(state, dist, cell_to_index):
         dist: a numpy array representing the shortest distances between
                 all pairs of empty cells.
         cell_to_index: a dictionary mapping each cell to its index in the
-                        dsit matrix.
+                        distance matrix.
 
         returns:
         max_dist: the maximum distance between any two food cells.
         f1_index: the index of the first food cell in the distance matrix.
         f2_index: the index of the second food cell in the distance matrix.
     """
-    food_Pos = state.getFood().asList()
+    food_pos = state.getFood().asList()
 
     # If less than 2 food pts, min_dist = 0
-    if len(food_Pos) < 2:
+    if len(food_pos) < 2:
         return 0, 0, 0
 
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos if
+    food_indices = [cell_to_index[food] for food in food_pos if
                     food in cell_to_index]
 
     max_dist = - np.inf
@@ -331,7 +329,7 @@ class PacmanAgent(Agent):
 
     def __init__(self):
         super().__init__()
-        self.key_map = {}
+        self.cache = dict()
         self.max_depth = None
         self.dist = None
         self.cell_to_index = None
@@ -355,9 +353,10 @@ class PacmanAgent(Agent):
             player=1,
             depth=0,
             alpha=-np.inf,
-            beta=+np.inf)[1]
+            beta=+np.inf
+        )[1]
 
-    def cutOff(self, state, depth):
+    def cut_off(self, state, depth):
         """Evaluate if one of the cutoff conditions is met to stop recursion.
 
         Arguments:
@@ -371,11 +370,11 @@ class PacmanAgent(Agent):
             state.isWin()
             or state.isLose()
             or depth > self.max_depth
-            or ghost_dist(state, self.dist, self.cell_to_index) > 4
-            and depth > 3
+            # or ghost_dist(state, self.dist, self.cell_to_index) > 4
+            # and depth > 3
         )
 
-    def eval(self, state):
+    def evaluate(self, state):
         """Given a Pacman game state, returns an estimate of the
             expected utility of the game state.
 
@@ -383,13 +382,13 @@ class PacmanAgent(Agent):
             state: a game state. See API or class `pacman.GameState`.
 
             Returns:
-            A int.
+            int: the utility score of the state
         """
         if state.isWin():
-            return 5000 + state.getScore()
+            return np.inf
 
         if state.isLose():
-            return -5000 + state.getScore()
+            return -np.inf
 
         pacman_pos = state.getPacmanPosition()
         pacman_index = self.cell_to_index[pacman_pos]
@@ -419,11 +418,15 @@ class PacmanAgent(Agent):
             - 10 * state.getNumFood()
         )
 
-        # Provide sometimes better results but les robust
-        # return state.getScore() -  1*(dist_food_max + min_dist) - 2*dist_pac_food_min \
-        # - 10 * state.getNumFood() - 1 * wall_score(state) - 1 * \
-        #     food_score(state, self.dist, self.cell_to_index) - 1 *\
-        #             ghost_score(state, self.dist, self.cell_to_index)
+        # Provide better but less robust results
+        # return (
+        #     state.getScore()
+        #     - 1 * (dist_food_max + min_dist)
+        #     - 2 * dist_pac_food_min
+        #     - 10 * state.getNumFood() - 1 * wall_score(state)
+        #     - 1 * food_score(state, self.dist, self.cell_to_index)
+        #     - 1 * ghost_score(state, self.dist, self.cell_to_index)
+        # )
 
     def hminimax(self, state, player: bool, depth: int, alpha: float,
                  beta: float):
@@ -440,7 +443,7 @@ class PacmanAgent(Agent):
                        search tree
 
             Returns:
-            tuple of 4 elements
+            2-tuple containing
                 - utility score of the current state
                 - legal move as defined in `game.Directions`
         """
@@ -449,22 +452,13 @@ class PacmanAgent(Agent):
         move = Directions.STOP
 
         # Check cut-off conditions
-        if self.cutOff(state, depth):
-            return self.eval(state), move
+        if self.cut_off(state, depth):
+            return self.evaluate(state), move
 
         # Check cached states
         current_key = key(state, player)
-        if current_key in self.key_map:
-            inDepth = self.key_map[current_key]
-
-            if inDepth > depth:
-                self.key_map[current_key] = depth
-            else:
-                if player:
-                    return 5000, Directions.STOP
-                return -5000, Directions.STOP
-        else:
-            self.key_map[current_key] = depth
+        if (current_key, state.getScore()) in self.cache:
+            return self.cache[(current_key, state.getScore())]
 
         # Initial best score : -∞ for pacman, +∞ for ghost
         best_score = -np.inf if player else +np.inf
@@ -478,37 +472,34 @@ class PacmanAgent(Agent):
         # Explore successor nodes
         for successor, action in successors:
             # Evaluate next state with of other agent
-            eval = self.hminimax(successor, not player, depth + 1,
-                                 alpha, beta)[0]
+            eval = self.hminimax(
+                successor, not player, depth + 1,
+                alpha, beta
+            )[0]
 
             # Max player (pacman)
             if player:
-                alpha_pruning = eval >= beta
-                better_score = eval > best_score
-
                 # Best score / best move update
-                if alpha_pruning or better_score:
+                if eval > best_score:
                     best_score = eval
                     move = action
 
                 # Alpha pruning
-                if alpha_pruning:
+                if best_score >= beta:
                     break
-                alpha = max(alpha, eval)
+                alpha = max(alpha, best_score)
 
             # Min player (ghost)
             else:
-                beta_pruning = eval <= alpha
-                better_score = eval < best_score
-
                 # Best score / best move update
-                if beta_pruning or better_score:
+                if eval < best_score:
                     best_score = eval
                     move = action
 
                 # Beta pruning
-                if beta_pruning:
+                if best_score <= alpha:
                     break
-                beta = min(beta, eval)
+                beta = min(beta, best_score)
 
+        self.cache[(current_key, state.getScore())] = (best_score, move)
         return best_score, move
