@@ -1,16 +1,15 @@
 import numpy as np
-
 from pacman_module.game import Agent, Directions
 from pacman_module.util import manhattanDistance
 from itertools import combinations
 
 
-def key(state, maxPlayer):
+def key(state, player):
     """Returns a key that uniquely identifies a Pacman game state.
 
     Arguments:
         state:      a game state. See API or class `pacman.GameState`
-        maxPlayer:  boolean, 1 means its max's move, 0 means its min's move
+        player:     boolean, 1 means its max's move, 0 means its min's move
 
     Returns:
         A hashable key tuple.
@@ -21,7 +20,7 @@ def key(state, maxPlayer):
             state.getGhostDirection(1),
             state.getFood(),
             tuple(state.getCapsules()),
-            maxPlayer)
+            player)
 
 
 def get_extreme_foods(state):
@@ -120,18 +119,19 @@ def floyd_marshall_distance(state):
 
 
 def closest_food(state, dist, cell_to_index):
-    # Get pacman position
-    pacman_Pos = state.getPacmanPosition()
+    """
+    """
+    pacman_pos = state.getPacmanPosition()
     # Get the food positions
-    food_Pos = state.getFood().asList()
+    food_pos = state.getFood().asList()
 
-    if not food_Pos:
+    if not food_pos:
         return 0
 
     # Get the index of the Pacman position in the distance matrix
-    pacman_index = cell_to_index[pacman_Pos]
+    pacman_index = cell_to_index[pacman_pos]
     # Get the indices of the food points in the distance matrix
-    food_indices = [cell_to_index[food] for food in food_Pos
+    food_indices = [cell_to_index[food] for food in food_pos
                     if food in cell_to_index]
 
     food_dist_list = []
@@ -139,7 +139,7 @@ def closest_food(state, dist, cell_to_index):
     pos = 0
     for food_index in food_indices:
         food_dist_list.append(dist[pacman_index][food_index])
-        food_pos_list.append([food_Pos[pos]])
+        food_pos_list.append([food_pos[pos]])
     nearest_food_dist = min(food_dist_list)
 
     nearest_food_Pos = food_pos_list[food_dist_list.index(nearest_food_dist)]
@@ -182,7 +182,7 @@ def ghost_score(state, dist, cell_to_index):
     return 1/ghost_dist(state, dist, cell_to_index)
 
 
-def closest_food_Pac_dist(state, dist, cell_to_index):
+def closest_food_dist(state, dist, cell_to_index):
     """Given a Pacman game state a matrix representing the distance
         between each pair of empty cells, and a dictionary mapping each
         returns the distance between Pacman and the closest food.
@@ -391,23 +391,33 @@ class PacmanAgent(Agent):
         if state.isLose():
             return -5000 + state.getScore()
 
-        pacman_Pos = state.getPacmanPosition()
-        pacman_index = self.cell_to_index[pacman_Pos]
+        pacman_pos = state.getPacmanPosition()
+        pacman_index = self.cell_to_index[pacman_pos]
 
-        if (len(state.getFood().asList()) == 0):
+        if state.getNumFood() == 0:
             dist_food_max = 0
             min_dist = 0
         else:
-            dist_food_max, f1, f2 =\
-                max_inter_food_dist(state, self.dist, self.cell_to_index)
-            min_dist = min(self.dist[pacman_index][f1],
-                           self.dist[pacman_index][f2])
+            dist_food_max, f1, f2 = max_inter_food_dist(
+                state, self.dist, self.cell_to_index
+            )
+            min_dist = min(
+                self.dist[pacman_index][f1],
+                self.dist[pacman_index][f2]
+            )
 
-        dist_pac_food_min =\
-            closest_food_Pac_dist(state, self.dist, self.cell_to_index)
+        dist_pac_food_min = closest_food_dist(
+            state,
+            self.dist,
+            self.cell_to_index
+        )
 
-        return state.getScore() - 1 * (dist_food_max + min_dist)\
-            - 2 * dist_pac_food_min - 10 * state.getNumFood()
+        return (
+            state.getScore()
+            - 1 * (dist_food_max + min_dist)
+            - 2 * dist_pac_food_min
+            - 10 * state.getNumFood()
+        )
 
         # Provide sometimes better results but les robust
         # return state.getScore() -  1*(dist_food_max + min_dist) - 2*dist_pac_food_min \
