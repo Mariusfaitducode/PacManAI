@@ -2,8 +2,53 @@ import numpy as np
 from scipy.stats import binom
 
 from pacman_module.game import Agent, Directions, manhattanDistance
-from pacman_module.util import Queue
+from pacman_module.util import Queue, PriorityQueue
 
+
+"""
+Bayes filter with BFS
+Layout               Ghost     #Ghost   Score    Time [s]     Error
+-------------------  -------   ------   --------  ----------  -------
+large_filter         fearless  1             676       4.520       --
+large_filter         afraid    1             648       4.797       --
+large_filter         terrified 1             644       5.039       --
+-------------------  -------   ------   --------  ----------  -------
+large_filter_walls   fearless  1             650       9.125       --
+large_filter_walls   afraid    1             654       7.793       --
+large_filter_walls   terrified 1             426      12.378       --
+-------------------  -------   ------   --------  ----------  -------
+zones                fearless  4            1263       4.383       --
+zones                afraid    4            1179       6.670       --
+zones                terrified 4            1251       4.569       --
+-------------------  -------   ------   --------  ----------  -------
+grid                 fearless  4            1263       4.383       --
+grid                 afraid    4            1179       6.670       --
+grid                 terrified 4            1251       4.569       --
+-------------------  -------   ------   --------  ----------  -------
+"""
+
+
+"""
+Bayes filter with A*, floyd distance heuristic
+Layout               Ghost     #Ghost   Score    Time [s]        Error
+-------------------  -------   ------   --------  -------------  -------
+large_filter         fearless  1             676   4.724 (+0.2)    --
+large_filter         afraid    1             648   4.797 (-0.1)    --
+large_filter         terrified 1             644   5.668 (+0.6)    --
+-------------------  -------   ------   --------  -------------  -------
+large_filter_walls   fearless  1             650   3.182 (-7.8)    --
+large_filter_walls   afraid    1             654   3.571 (-4.1)    --
+large_filter_walls   terrified 1             426   5.285 (-6.7)   --
+-------------------  -------   ------   --------  -------------  -------
+zones                fearless  4            1263   2.108 (-2.6)    --
+zones                afraid    4            1179   2.575 (-3.2)    --
+zones                terrified 4            1251   1.908 (-2.6)    --
+-------------------  -------   ------   --------  -------------  -------
+grid                 fearless  4            1263   1.265 (-3.1)     --
+grid                 afraid    4            1179   1.322 (-4.7)     --
+grid                 terrified 4            1251   1.047 (-3.5)     --
+-------------------  -------   ------   --------  -------------  -------
+"""
 
 def floyd_warshall(walls):
     """Given a Pacman game state, return a matrix representing
@@ -390,15 +435,17 @@ class PacmanAgent(Agent):
             # Compute the real distance between pacman
             # and that most probable position
             dist_pac_ghost[i] = \
-                self.dist[self.cell_to_index[position],
-                          self.cell_to_index[tuple(ghost_pos[i])]]
+                self.dist[
+                    self.cell_to_index[position],
+                    self.cell_to_index[tuple(ghost_pos[i])]
+                ]
 
-        # Idex of the closest ghost
-        closest_gost = np.argmin(dist_pac_ghost)
+        # Index of the closest ghost
+        closest_ghost = np.argmin(dist_pac_ghost)
 
         # Return the closest ghost index for the identification
         # and its position
-        return closest_gost, ghost_pos[closest_gost]
+        return closest_ghost, ghost_pos[closest_ghost]
 
     def update_targetted_ghost(self, closest_gost, ghost_pos):
         """Given the closest ghost at the current step, update the ghost
@@ -432,6 +479,62 @@ class PacmanAgent(Agent):
             # If the closest ghost is the targetted one,
             # reset the attention duration
             self.attention_durations = 4
+
+    def astar(self, pacman_pos:tuple, ghost_pos:np.ndarray, walls):
+        """Given Pacman's position, a ghost estimated position and the layout,
+        returns a list of legal moves to reach the ghost computed using A* with Floyd distances.
+
+        Arguments:
+            pacman_pos: The starting position (x, y) of Pacman
+            ghost_pos: The target position (x, y) of the ghost
+            walls: The W x H grid of the layout's walls
+
+        Returns:
+            A list of legal moves.
+        """
+
+        fringe = PriorityQueue()
+        path = []
+        fringe.push((pacman_pos, path, 0.), 0.)
+        closed = set()
+
+        while True:
+            if fringe.isEmpty():
+                return []
+
+            priority, (current, path, cost) = fringe.pop()
+
+            if current[0] == int(ghost_pos[0]) and current[1] == int(ghost_pos[1]):
+                return path
+
+            if current in closed:
+                continue
+
+            closed.add(current)
+
+            for inc_y, inc_x, action in self.moves:
+                # Check new coordinates validity
+                new_y, new_x = current[0] + inc_y, current[1] + inc_x
+                if new_x <= 0 or new_y <= 0:
+                    continue
+                if new_y >= walls.width or new_x >= walls.height:
+                    continue
+
+                # Check if new coords is a wall
+                if walls[new_y][new_x]: continue
+                # Get floyd distance from new position to ghost
+                floyd_dist = self.dist[
+                    self.cell_to_index[(new_y, new_x)],
+                    self.cell_to_index[tuple(ghost_pos)],
+                ]
+
+                # Add new path to fringe
+                fringe.push(
+                    ((new_y, new_x), path + [action], cost + 1),
+                    floyd_dist + cost + 1,
+                )
+
+        return path
 
     def bfs(self, pacman_pos, ghost_pos, walls):
         """Given a Pacman's position, a ghost etimated position and the layout,
@@ -497,7 +600,7 @@ class PacmanAgent(Agent):
             self.dist, self.cell_to_index = floyd_warshall(walls)
             # print("The distance", self.dist)
 
-        # Closest ghost index and its position position
+        # Closest ghost index and its position
         closest_ghost, closest_ghost_pos =\
             self.closes_ghost_positions(beliefs, eaten, position)
 
@@ -507,8 +610,11 @@ class PacmanAgent(Agent):
         # TRY A_Star VS BFS
         # Since the layout is quite small, BFS should be not too bad
 
-        # Perform BFS to find shortest path to the target ghost
-        path_to_ghost = self.bfs(position, closest_ghost_pos, walls)
+        # Perform BFS to find the shortest path to the target ghost
+        # path_to_ghost = self.bfs(position, closest_ghost_pos, walls)
+
+        # Perform A* to find the shortest path to the target ghost
+        path_to_ghost = self.astar(position, closest_ghost_pos, walls)
 
         if path_to_ghost:
             # Return the first move in the path
