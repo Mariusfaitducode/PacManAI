@@ -46,7 +46,7 @@ def get_extreme_foods(state):
 
 
 def floyd_warshall(state):
-    """Given a Pacman game state, return a matrix representing
+    """Returns a matrix representing
         the shortest distances between all pairs of empty cells
         and a dictionary mapping each cell to its index in the matrix.
 
@@ -149,7 +149,9 @@ def closest_food(state, dist, cell_to_index):
 def food_score(state, dist, cell_to_index):
     food_pos = state.getFood().asList()
 
-    nearest_food, nearest_food_position = closest_food(state, dist, cell_to_index)
+    nearest_food, nearest_food_position = closest_food(
+        state, dist, cell_to_index
+    )
     food_score = 1 / nearest_food
 
     # Remove the nearest food
@@ -159,7 +161,9 @@ def food_score(state, dist, cell_to_index):
                     if food in cell_to_index]
 
     for food_index in food_indices:
-        food_score += 1/dist[cell_to_index[nearest_food_position[0]]][food_index]
+        food_score += 1 / dist[
+            cell_to_index[nearest_food_position[0]]
+        ][food_index]
     return food_score
 
 
@@ -331,8 +335,8 @@ class PacmanAgent(Agent):
         super().__init__()
         self.cache = dict()
         self.max_depth = None
-        self.dist = None
-        self.cell_to_index = None
+        self.floyd_dist = None
+        self.floyd_indices = None
 
     def get_action(self, state):
         """Given a Pacman game state, returns a legal move.
@@ -343,21 +347,30 @@ class PacmanAgent(Agent):
         Returns:
             A legal move as defined in `game.Directions`.
         """
-        if self.dist is None:
-            self.dist, self.cell_to_index = floyd_warshall(state)
 
-        self.max_depth = max(2, min(5, 2 * state.getNumFood()))
+        # Calculate the floyd distance matrix
+        if self.floyd_dist is None:
+            self.floyd_dist, self.floyd_indices = floyd_warshall(state)
 
+        # Estimate a max depth value based
+        if self.max_depth is None:
+            self.max_depth = np.ceil(
+                np.log(state.getWalls().width * state.getWalls().height)
+                / np.log(4)
+            )
+            # self.max_depth = 12
+        # self.max_depth = max(2, min(5, 2 * state.getNumFood()))
         return self.hminimax(
             state=state,
             player=1,
             depth=0,
             alpha=-np.inf,
-            beta=+np.inf
+            beta=+np.inf,
+            _explored=set()
         )[1]
 
     def cut_off(self, state, depth):
-        """Evaluate if one of the cutoff conditions is met to stop recursion.
+        """Returns whether a cutoff condition is met to stop recursion.
 
         Arguments:
             state:  a game state. See API or class `pacman.GameState`.
@@ -375,14 +388,13 @@ class PacmanAgent(Agent):
         )
 
     def evaluate(self, state):
-        """Given a Pacman game state, returns an estimate of the
-            expected utility of the game state.
+        """Returns an estimate of the expected evaluation of the game state.
 
             Arguments:
             state: a game state. See API or class `pacman.GameState`.
 
             Returns:
-            int: the utility score of the state
+            int: the evaluation score of the state
         """
         if state.isWin():
             return np.inf
@@ -391,30 +403,31 @@ class PacmanAgent(Agent):
             return -np.inf
 
         pacman_pos = state.getPacmanPosition()
-        pacman_index = self.cell_to_index[pacman_pos]
+        pacman_index = self.floyd_indices[pacman_pos]
 
         if state.getNumFood() == 0:
             dist_food_max = 0
             min_dist = 0
         else:
             dist_food_max, f1, f2 = max_inter_food_dist(
-                state, self.dist, self.cell_to_index
+                state, self.floyd_dist, self.floyd_indices
             )
             min_dist = min(
-                self.dist[pacman_index][f1],
-                self.dist[pacman_index][f2]
+                self.floyd_dist[pacman_index][f1],
+                self.floyd_dist[pacman_index][f2]
             )
 
         dist_pac_food_min = closest_food_dist(
             state,
-            self.dist,
-            self.cell_to_index
+            self.floyd_dist,
+            self.floyd_indices
         )
 
         return (
             state.getScore()
             - 1 * (dist_food_max + min_dist)
             - 2 * dist_pac_food_min
+            # + ghost_dist(state, self.floyd_dist, self.floyd_indices) / 2
             - 10 * state.getNumFood()
         )
 
@@ -424,14 +437,13 @@ class PacmanAgent(Agent):
         #     - 1 * (dist_food_max + min_dist)
         #     - 2 * dist_pac_food_min
         #     - 10 * state.getNumFood() - 1 * wall_score(state)
-        #     - 1 * food_score(state, self.dist, self.cell_to_index)
-        #     - 1 * ghost_score(state, self.dist, self.cell_to_index)
+        #     - 1 * food_score(state, self.floyd_dist, self.floyd_indices)
+        #     - 1 * ghost_score(state, self.floyd_dist, self.floyd_indices)
         # )
 
     def hminimax(self, state, player: bool, depth: int, alpha: float,
-                 beta: float):
-        """Given a Pacman game state, returns the best possible move
-            using hminimax with alpha-beta pruning.
+                 beta: float, _explored: set):
+        """Returns the best possible move using hminimax with alpha-beta pruning.
 
             Arguments:
             state:     a game state. See API or class `pacman.GameState`.
@@ -463,6 +475,10 @@ class PacmanAgent(Agent):
         # Initial best score : -∞ for pacman, +∞ for ghost
         best_score = -np.inf if player else +np.inf
 
+        # Update explored set (copy is necessary: python sucks)
+        explored = _explored.copy()
+        explored.add(current_key)
+
         # Determine successors based on player
         successors = (
             state.generatePacmanSuccessors() if player
@@ -471,10 +487,14 @@ class PacmanAgent(Agent):
 
         # Explore successor nodes
         for successor, action in successors:
+            # Check if successor is already explored
+            if key(successor, not player) in _explored:
+                continue
+
             # Evaluate next state with of other agent
             eval = self.hminimax(
                 successor, not player, depth + 1,
-                alpha, beta
+                alpha, beta, explored
             )[0]
 
             # Max player (pacman)

@@ -149,7 +149,9 @@ def closest_food(state, dist, cell_to_index):
 def food_score(state, dist, cell_to_index):
     food_pos = state.getFood().asList()
 
-    nearest_food, nearest_food_position = closest_food(state, dist, cell_to_index)
+    nearest_food, nearest_food_position = closest_food(
+        state, dist, cell_to_index
+    )
     food_score = 1 / nearest_food
 
     # Remove the nearest food
@@ -159,7 +161,9 @@ def food_score(state, dist, cell_to_index):
                     if food in cell_to_index]
 
     for food_index in food_indices:
-        food_score += 1/dist[cell_to_index[nearest_food_position[0]]][food_index]
+        food_score += 1 / dist[
+            cell_to_index[nearest_food_position[0]]
+        ][food_index]
     return food_score
 
 
@@ -375,8 +379,7 @@ class PacmanAgent(Agent):
         )
 
     def evaluate(self, state):
-        """Given a Pacman game state, returns an estimate of the
-            expected utility of the game state.
+        """Returns an estimate of the expected utility of the game state.
 
             Arguments:
             state: a game state. See API or class `pacman.GameState`.
@@ -430,8 +433,7 @@ class PacmanAgent(Agent):
 
     def hminimax(self, state, player: bool, depth: int, alpha: float,
                  beta: float):
-        """Given a Pacman game state, returns the best possible move
-            using hminimax with alpha-beta pruning.
+        """Returns the best possible move using hminimax with alpha-beta pruning.
 
             Arguments:
             state:     a game state. See API or class `pacman.GameState`.
