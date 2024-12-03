@@ -156,7 +156,8 @@ class BeliefStateAgent(Agent):
         T_matrix = np.zeros((W, H, W, H))
 
         # Probability of the ghost to be affraid is 2^fear_level
-        ghost_fear_prob = 2**self.ghost_dict[self.ghost]
+        ghost_fear_prob = 2**self.ghost_dict.get(self.ghost)
+
 
         # Loop over each cell of the layout
         for i in range(W):
@@ -190,7 +191,7 @@ class BeliefStateAgent(Agent):
 
                     # If the ghost is afraid, the probability of the ghost
                     # to be further is 2^fear_level otherwise 1
-                    if pacm_ghost_dist < pacm_ghost_dist_new:
+                    if pacm_ghost_dist <= pacm_ghost_dist_new:
                         prob_ghost[counter] = ghost_fear_prob
                     else:
                         prob_ghost[counter] = 1
@@ -214,9 +215,9 @@ class BeliefStateAgent(Agent):
                         counter += 1
                         continue
                     else:
-                        T_matrix[i, j, x, y] = prob_ghost[counter]
+                        T_matrix[x, y, i, j] = prob_ghost[counter]
 
-                    counter += 1
+                        counter += 1
 
         # Return the transition matrix
         return T_matrix
