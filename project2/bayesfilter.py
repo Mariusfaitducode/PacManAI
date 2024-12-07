@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.stats import binom
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import floyd_warshall as sparse_floyd_warshall
 
 from pacman_module.game import Agent, Directions, manhattanDistance
 from pacman_module.util import Queue, PriorityQueue
@@ -27,7 +29,6 @@ grid                 terrified 4            1251       4.569       --
 -------------------  -------   ------   --------  ----------  -------
 """
 
-
 """
 Bayes filter with A*, floyd distance heuristic
 Layout               Ghost     #Ghost   Score    Time [s]        Error
@@ -50,6 +51,51 @@ grid                 terrified 4            1251   1.047 (-3.5)     --
 -------------------  -------   ------   --------  -------------  -------
 """
 
+"""
+Bayes filter with A* and Bayes, floyd distance heuristic
+Layout               Ghost     #Ghost   Score    Time [s]        Error
+-------------------  -------   ------   --------  -------------  -------
+large_filter         fearless  1             678         0.1579    --
+large_filter         afraid    1             676         0.1647    --
+large_filter         terrified 1             654         0.2789    --
+-------------------  -------   ------   --------  -------------  -------
+large_filter_walls   fearless  1             676         0.1405    --
+large_filter_walls   afraid    1             679         0.1436    --
+large_filter_walls   terrified 1             648         0.2769    --
+-------------------  -------   ------   --------  -------------  -------
+zones                fearless  4            1255         0.3878    --
+zones                afraid    4            1261         0.4235    --
+zones                terrified 4            1251         0.4350    --
+-------------------  -------   ------   --------  -------------  -------
+grid                 fearless  4            1243         0.4430     --
+grid                 afraid    4            1256         0.3212     --
+grid                 terrified 4            1226         0.4431     --
+-------------------  -------   ------   --------  -------------  -------
+"""
+
+"""
+Bayes filter with distance reduction with max belief, floyd distance heuristic
+Layout               Ghost     #Ghost   Score    Time [s]        Error
+-------------------  -------   ------   --------  -------------  -------
+large_filter         fearless  1             676         0.0752    --
+large_filter         afraid    1             676         0.0731    --
+large_filter         terrified 1             673         0.0972    --
+-------------------  -------   ------   --------  -------------  -------
+large_filter_walls   fearless  1             676         0.0675    --
+large_filter_walls   afraid    1             679         0.0637    --
+large_filter_walls   terrified 1             682         0.0461    --
+-------------------  -------   ------   --------  -------------  -------
+zones                fearless  4            1271         0.1781    --
+zones                afraid    4            1264         0.1774    --
+zones                terrified 4            1266         0.1883    --
+-------------------  -------   ------   --------  -------------  -------
+grid                 fearless  4            1272         0.1307     --
+grid                 afraid    4            1258         0.1819     --
+grid                 terrified 4            1255         0.1706     --
+-------------------  -------   ------   --------  -------------  -------
+"""
+
+
 def floyd_warshall(walls):
     """Given a Pacman game state, return a matrix representing
         the shortest distances between all pairs of empty cells
@@ -64,41 +110,45 @@ def floyd_warshall(walls):
         - cell_to_index:    a dictionary mapping each cell to its index
                             in the matrix.
     """
-    walls_pos = walls
-    rows, cols = walls_pos.width, walls_pos.height
+    # Transform the walls into a numpy array
+    walls_array = np.array(walls.data)
 
-    # Want to ONLY keep cells without walls
-    open_cells = [(x, y) for x in range(rows) for y in range(cols)
-                  if not walls_pos[x][y]]
+    # Possible moves for a cell (going [West, East, North, South])
+    moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
-    # Number of "empty" cells
-    nbr_empty_cells = len(open_cells)
-    # Dictionary from the mapping from cell to index
-    cell_to_index = {cell: index for index, cell in enumerate(open_cells)}
+    H, W = walls_array.shape
+    # list of cells' coordinates in the grid that are not walls
+    empty_cells = [(x, y) for x in range(H) for y in range(W)
+                   if not walls_array[x, y]]
 
-    dist = np.full((nbr_empty_cells, nbr_empty_cells), np.inf)
+    # Mapping from cell to index
+    cell_to_index = {cell: idx for idx, cell in enumerate(empty_cells)}
+    nbr_empty_cells = len(empty_cells)
 
-    # Set the distance from a cell to itself to 0 (all diag elements = 0)
-    for id_cell in range(nbr_empty_cells):
-        dist[id_cell][id_cell] = 0
+    # Sparse adjacency matrix
+    H_indices = []
+    W_indices = []
+    data = []
 
-    # Check which empty cells are directly adjacent/reachable to each other
-    for (x, y) in open_cells:
-        current_cell_id = cell_to_index[(x, y)]
-        # Check if the neighbors are empty cells
-        for x_inc, y_inc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + x_inc, y + y_inc
+    # Populate adjacency matrix with edges (distance = 1 for neighbors)
+    # Determine the neighbors of each cell, and add an edge between them
+    for (x, y) in empty_cells:
+        current_idx = cell_to_index[(x, y)]
+        for dx, dy in moves:
+            nx, ny = x + dx, y + dy
             if (nx, ny) in cell_to_index:
-                neighbor_cell_id = cell_to_index[(nx, ny)]
-                # The adjacency matrix is symmetric
-                dist[current_cell_id][neighbor_cell_id] = 1
-                dist[neighbor_cell_id][current_cell_id] = 1
+                neighbor_idx = cell_to_index[(nx, ny)]
+                H_indices.append(current_idx)
+                W_indices.append(neighbor_idx)
+                data.append(1)
 
-    # Floyd-Warshall algorithm to compute the shortest real paths between empty
-    for k in range(nbr_empty_cells):
-        for i in range(nbr_empty_cells):
-            for j in range(nbr_empty_cells):
-                dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j])
+    # Create sparse matrix representation of the graph
+    adjacency_matrix = csr_matrix((data, (W_indices, H_indices)),
+                                  shape=(nbr_empty_cells, nbr_empty_cells))
+
+    # Compute shortest paths using sparse Floyd-Warshall
+    dist = sparse_floyd_warshall(adjacency_matrix,
+                                 directed=False, unweighted=True)
 
     return dist, cell_to_index
 
@@ -158,66 +208,57 @@ class BeliefStateAgent(Agent):
         # Probability of the ghost to be affraid is 2^fear_level
         ghost_fear_prob = 2**self.ghost_dict.get(self.ghost)
 
+        # Precompute Manhattan distances from Pacman's position
+        pacman_distances = np.fromfunction(
+            lambda x, y: manhattanDistance((x, y), position),
+            (W, H),
+            dtype=int
+        )
 
         # Loop over each cell of the layout
         for i in range(W):
             for j in range(H):
-                # To store the probability of the ghost to be in
-                # the 4 possible cells
-                prob_ghost = np.zeros(4)
-                counter = 0
-
                 # If the cell is a wall, prob = 0
                 if walls[i][j]:
                     continue
 
+                # To store the probability of the ghost to be in
+                # the 4 possible cells
+                prob_ghost = np.zeros(len(moves))
+
                 # Current distance between pacman and the ghost
-                pacm_ghost_dist = manhattanDistance((i, j), position)
+                current_dist = pacman_distances[i, j]
 
                 # The probability of the ghost to be in another cell
                 # Provided the 4 possible moves ([right, left, up, down])
-                for (dx, dy) in moves:
-                    x = i + dx
-                    y = j + dy
+                for counter, (dx, dy) in enumerate(moves):
+                    x, y = i + dx, j + dy
 
                     # Verify if the index is not out of the range
                     # And that it is NOT a wall
-                    if (x < 0 or x >= W or y < 0 or y >= H or walls[x][y]):
-                        counter += 1
-                        continue
+                    if 0 <= x < W and 0 <= y < H and not walls[x][y]:
 
-                    # New distance between pacman and the "new" ghost position
-                    pacm_ghost_dist_new = manhattanDistance((x, y), position)
+                        # New distance between pacman and the ghost position
+                        # After a potenial move
+                        new_dist = pacman_distances[x, y]
 
-                    # If the ghost is afraid, the probability of the ghost
-                    # to be further is 2^fear_level otherwise 1
-                    if pacm_ghost_dist <= pacm_ghost_dist_new:
-                        prob_ghost[counter] = ghost_fear_prob
-                    else:
-                        prob_ghost[counter] = 1
+                        # If the ghost is afraid, the probability of the ghost
+                        # to be further is 2^fear_level otherwise 1
+                        if current_dist <= new_dist:
+                            prob_ghost[counter] = ghost_fear_prob
+                        else:
+                            prob_ghost[counter] = 1
 
-                    counter += 1
+                # Normalize probabilities
+                norm_term = prob_ghost.sum()
+                if norm_term > 0:
+                    prob_ghost /= norm_term
 
-                # Normalization of the probabilities
-                norm_term = np.sum(prob_ghost)
-                if norm_term != 0:
-                    prob_ghost = prob_ghost / norm_term
-
-                counter = 0
-                # Update of the transition matrix
-                for (dx, dy) in moves:
-                    x = i + dx
-                    y = j + dy
-
-                    # Verify if the index is not out of the range
-                    # And that it is NOT a wall
-                    if (x < 0 or x >= W or y < 0 or y >= H or walls[x][y]):
-                        counter += 1
-                        continue
-                    else:
+                # Assign probabilities to the transition matrix
+                for counter, (dx, dy) in enumerate(moves):
+                    x, y = i + dx, j + dy
+                    if 0 <= x < W and 0 <= y < H and not walls[x][y]:
                         T_matrix[x, y, i, j] = prob_ghost[counter]
-
-                        counter += 1
 
         # Return the transition matrix
         return T_matrix
@@ -245,24 +286,27 @@ class BeliefStateAgent(Agent):
         # Definition of the observation matrix with the provided dimensions
         O_matrix = np.zeros((W, H))
 
-        mean_bin = self.n*self.p
+        # Precompute Manhattan distances from Pacman's position
+        pacman_distances = np.fromfunction(
+            lambda x, y: np.abs(x - position[0]) + np.abs(y - position[1]),
+            (W, H),
+            dtype=int
+        )
 
-        # Loop over each cell of the layout
-        for i in range(W):
-            for j in range(H):
-                # If the cell is a wall, the ghost CANNOT be there
-                if walls[i][j]:
-                    continue
+        # Compute z for all non-wall cells
+        mean_bin = self.n * self.p
+        z_values = evidence - pacman_distances + mean_bin
 
-                # Distance between pacman and the supposed ghost position
-                dist_pac_cell = manhattanDistance(position, (i, j))
+        # Identify valid z values (within [0, n]) and not walls
+        walls_array = np.array(walls.data)
+        valid_z_mask = (z_values >= 0) & (z_values <= self.n) & (~walls_array)
 
-                # Extraction of the variable following the binomial
-                z = evidence - dist_pac_cell + mean_bin
+        # print("valid_z_mask", valid_z_mask)
+        # Compute binomial probabilities for valid z values
+        valid_probs = binom.pmf(z_values[valid_z_mask], self.n, self.p)
 
-                # Only z only in the range [0, n]
-                if (0 <= z <= self.n):
-                    O_matrix[i, j] = binom.pmf(z, self.n, self.p)
+        # Assign probabilities to valid cells
+        O_matrix[valid_z_mask] = valid_probs
 
         # Return the observation matrix
         return O_matrix
@@ -392,7 +436,7 @@ class PacmanAgent(Agent):
             (0, 1, Directions.NORTH)
         ]
 
-    def closes_ghost_positions(self, beliefs, eaten, position):
+    def closest_ghost_positions(self, beliefs, eaten, position):
         """Provide the index of the closest ghost for which the maximum
         position belief provide the closes distance to pacman's position.
 
@@ -446,9 +490,10 @@ class PacmanAgent(Agent):
 
         # Return the closest ghost index for the identification
         # and its position
-        return closest_ghost, ghost_pos[closest_ghost]
+        return closest_ghost, ghost_pos[closest_ghost], ghost_pos
 
-    def update_targetted_ghost(self, closest_gost, ghost_pos):
+    def update_targetted_ghost(self, closest_ghost, closest_ghost_pos,
+                               ghost_pos, eaten):
         """Given the closest ghost at the current step, update the ghost
         targetted by pacman if a ghost has been closer to pacman for 4
         following steps than its actual targetted.
@@ -460,30 +505,39 @@ class PacmanAgent(Agent):
         Returns:
             None
         """
+        if self.targetted_ghosts is not None and eaten[self.targetted_ghosts]:
+            self.targetted_ghosts = None
+            self.targetted_ghosts_pos = None
+            self.attention_durations = None
+
         # Identify the first closest ghost
         if self.targetted_ghosts is None:
-            self.targetted_ghosts = closest_gost
+            self.targetted_ghosts = closest_ghost
             self.targetted_ghosts_pos = ghost_pos
             self.attention_durations = 4
 
         # If the closest ghost is not the targetted one
-        if self.targetted_ghosts != closest_gost:
+        if self.targetted_ghosts != closest_ghost:
             # If the attention duration is over, change of targetted_ghosts
             if self.attention_durations == 0:
-                self.targetted_ghosts = closest_gost
+                self.targetted_ghosts = closest_ghost
+                self.targetted_ghosts_pos = closest_ghost_pos
                 self.attention_durations = 4
             # If the attention duration is not over,
             # decrease the remaining attention durantion for that ghost
             else:
                 self.attention_durations -= 1
+                self.targetted_ghosts_pos = ghost_pos[self.targetted_ghosts]
         else:
             # If the closest ghost is the targetted one,
             # reset the attention duration
             self.attention_durations = 4
+            self.targetted_ghosts_pos = ghost_pos[self.targetted_ghosts]
 
-    def astar(self, pacman_pos:tuple, ghost_pos:np.ndarray, walls):
+    def astar(self, pacman_pos, ghost_pos, walls):
         """Given Pacman's position, a ghost estimated position and the layout,
-        returns a list of legal moves to reach the ghost computed using A* with Floyd distances.
+        returns a list of legal moves to reach the ghost computed
+        using A* with Floyd distances.
 
         Arguments:
             pacman_pos: The starting position (x, y) of Pacman
@@ -505,7 +559,8 @@ class PacmanAgent(Agent):
 
             priority, (current, path, cost) = fringe.pop()
 
-            if current[0] == int(ghost_pos[0]) and current[1] == int(ghost_pos[1]):
+            if current[0] == int(ghost_pos[0])\
+                    and current[1] == int(ghost_pos[1]):
                 return path
 
             if current in closed:
@@ -522,7 +577,8 @@ class PacmanAgent(Agent):
                     continue
 
                 # Check if new coords is a wall
-                if walls[new_y][new_x]: continue
+                if walls[new_y][new_x]:
+                    continue
                 # Get floyd distance from new position to ghost
                 floyd_dist = self.dist[
                     self.cell_to_index[(new_y, new_x)],
@@ -533,6 +589,72 @@ class PacmanAgent(Agent):
                 fringe.push(
                     ((new_y, new_x), path + [action], cost + 1),
                     floyd_dist + cost + 1,
+                )
+
+        return path
+
+    def astarBelief(self, pacman_pos, ghost_pos, walls, beliefs):
+        """Given Pacman's position, a ghost estimated position and the layout,
+        returns a list of legal moves to reach the ghost computed using A*
+        with Floyd distances.
+
+        Arguments:
+            pacman_pos: The starting position (x, y) of Pacman
+            ghost_pos: The target position (x, y) of the ghost
+            walls: The W x H grid of the layout's walls
+
+        Returns:
+            A list of legal moves.
+        """
+
+        fringe = PriorityQueue()
+        path = []
+        fringe.push((pacman_pos, path, 0.), 0.)
+        closed = set()
+
+        while True:
+            if fringe.isEmpty():
+                return []
+
+            priority, (current, path, cost) = fringe.pop()
+
+            if current[0] == int(ghost_pos[0])\
+                    and current[1] == int(ghost_pos[1]):
+                return path
+
+            if current in closed:
+                continue
+
+            closed.add(current)
+
+            for inc_y, inc_x, action in self.moves:
+                # Check new coordinates validity
+                new_y, new_x = current[0] + inc_y, current[1] + inc_x
+                if new_x <= 0 or new_y <= 0:
+                    continue
+                if new_y >= walls.width or new_x >= walls.height:
+                    continue
+
+                # Check if new coords is a wall
+                if walls[new_y][new_x]:
+                    continue
+                # Get floyd distance from new position to ghost
+                floyd_dist = self.dist[
+                    self.cell_to_index[(new_y, new_x)],
+                    self.cell_to_index[tuple(ghost_pos)],
+                ]
+
+                # Calculate the probability density at the new cell
+                density = self.getDensity((current[0], current[1]),
+                                          inc_x, inc_y,
+                                          beliefs[self.targetted_ghosts])
+                # Use density to adjust the heuristic
+                adjusted_heuristic = density * 1
+
+                # Add new path to fringe
+                fringe.push(
+                    ((new_y, new_x), path + [action], cost + 1),
+                    floyd_dist + cost + 1 + adjusted_heuristic,
                 )
 
         return path
@@ -585,6 +707,112 @@ class PacmanAgent(Agent):
         # No path found
         return []
 
+    def findOptimalMove(self, pacPos, walls, beliefs):
+        """
+        Determines the best move for Pacman based on real distance
+        the belief about the ghost position.
+
+        Arguments:
+            pacPos: Pacman's current position.
+            walls: The W x H grid of the layout's walls
+            beliefs: The list of current ghost belief states.
+            get_density: Function to compute the density in a given direction.
+
+        Returns:
+            optimalmove: The optimal move direction
+        """
+        x, y = pacPos
+        optimalmove = Directions.STOP
+
+        # Step 1: Compute moves that minimize the real distance
+        possible_moves = []
+        min_distance = np.inf
+
+        for dx, dy, move in self.moves:
+            if walls[x + dx][y + dy]:
+                continue
+
+            new_pos = (x + dx, y + dy)
+            ghost_pos = self.targetted_ghosts_pos
+
+            distance = self.dist[self.cell_to_index[tuple(new_pos)],
+                                 self.cell_to_index[tuple(ghost_pos)]]
+            possible_moves.append((distance, dx, dy, move))
+            min_distance = min(min_distance, distance)
+
+        # Filter moves to only those that will decrease the distance to pacman
+        optimal_moves = [(dx, dy, move) for dist, dx, dy, move
+                         in possible_moves if dist == min_distance]
+
+        if len(optimal_moves) == 1:
+            # If only one optimal move exists, return it
+            return optimal_moves[0][2]
+
+        # Choose the move with leading to the highest probability
+        # of reaching the targeted ghost
+        max_density = - np.inf
+
+        for dx, dy, move in optimal_moves:
+            if walls[x + dx][y + dy]:
+                continue
+
+            density = self.getDensity(pacPos, dx, dy,
+                                      beliefs[self.targetted_ghosts])
+
+            if density > max_density:
+                max_density = density
+                optimalmove = move
+
+        return optimalmove
+
+    def getDensity(self, pacPos, dx, dy, belief):
+        """
+       Method computing the probability of finding the targetted ghost in a
+       given direction.
+
+        Arguments:
+            pacPos: The current position of Pacman (x, y).
+            dx: The change in the x-coordinate for the move.
+            dy: The change in the y-coordinate for the move.
+            beliefs: The list of current ghost belief states.
+
+        Returns:
+            density: The total probability (density) in the
+                    direction specified by dx, dy.
+        """
+        W, H = belief.shape
+        x, y = pacPos
+
+        density = 0
+
+        # If the move is in the x direction (dx is non-zero)
+        if dx != 0:
+            # defines a range of x-coordinates for iteration
+            # based on the movement direction
+            x_range = range(x + dx, W if dx > 0 else -1, dx)
+            for i in x_range:
+                starty = abs(x - i)
+                y_min = max(y - starty, 0)
+                y_max = min(y + starty + 1, H)
+                # Sum the slice of the row i of the belief matrix
+                # covering columns from y_min to y_max
+                density += belief[i, y_min:y_max].sum()
+
+        # If the move is in the y direction (dy is non-zero)
+        elif dy != 0:
+            # defines a range of x-coordinates for iteration
+            # based on the movement direction
+            y_range = range(y + dy, H if dy > 0 else -1, dy)
+            for j in y_range:
+                startx = abs(y - j)
+                x_min = max(x - startx, 0)
+                x_max = min(x + startx + 1, W)
+                # Sum the slice of the collumn j of the belief matrix
+                # covering columns from x_min to y_max
+                density += belief[x_min:x_max, j].sum()
+
+        return density
+
     def _get_action(self, walls, beliefs, eaten, position):
         """
         Arguments:
@@ -602,29 +830,36 @@ class PacmanAgent(Agent):
             # print("The distance", self.dist)
 
         # Closest ghost index and its position
-        closest_ghost, closest_ghost_pos =\
-            self.closes_ghost_positions(beliefs, eaten, position)
+        closest_ghost, closest_ghost_pos, ghost_pos =\
+            self.closest_ghost_positions(beliefs, eaten, position)
 
         # Update the targetted ghost
-        self.update_targetted_ghost(closest_ghost, closest_ghost_pos)
-
-        # TRY A_Star VS BFS
-        # Since the layout is quite small, BFS should be not too bad
+        self.update_targetted_ghost(closest_ghost,
+                                    closest_ghost_pos, ghost_pos, eaten)
 
         # Perform BFS to find the shortest path to the target ghost
         # path_to_ghost = self.bfs(position, closest_ghost_pos, walls)
 
         # Perform A* to find the shortest path to the target ghost
-        path_to_ghost = self.astar(position, closest_ghost_pos, walls)
+        # path_to_ghost = self.astar(position, closest_ghost_pos, walls)
 
-        if path_to_ghost:
-            # Return the first move in the path
-            return path_to_ghost[0]
-        else:
-            # Stop if no path found
-            return Directions.STOP
+        # Perform A*  using the belief to find the
+        # shortest path to the target ghost
+        # path_to_ghost = self.astarBelief(position,
+        #                       closest_ghost_pos, walls, beliefs)
 
-        return Directions.STOP
+        # if path_to_ghost:
+        #     # Return the first move in the path
+        #     return path_to_ghost[0]
+        # else:
+        #     # Stop if no path found
+        #     return Directions.STOP
+
+        # return Directions.STOP
+
+        optimalMove = self.findOptimalMove(position, walls, beliefs)
+
+        return optimalMove
 
     def get_action(self, state):
         """Given a Pacman game state, returns a legal move.
@@ -635,7 +870,7 @@ class PacmanAgent(Agent):
             state: a game state. See API or class `pacman.GameState`.
 
         Returns:
-            A legal move as defined in `game.Directions`.
+            A legal move as) defined in `game.Directions`.
         """
 
         return self._get_action(
