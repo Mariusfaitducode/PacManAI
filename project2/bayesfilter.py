@@ -258,7 +258,7 @@ class BeliefStateAgent(Agent):
                 for counter, (dx, dy) in enumerate(moves):
                     x, y = i + dx, j + dy
                     if 0 <= x < W and 0 <= y < H and not walls[x][y]:
-                        T_matrix[x, y, i, j] = prob_ghost[counter]
+                        T_matrix[i, j, x, y] = prob_ghost[counter]
 
         # Return the transition matrix
         return T_matrix
@@ -367,7 +367,7 @@ class BeliefStateAgent(Agent):
 
                     # Compute product of the transition matrix
                     # and the previous belief
-                    transition_belief += T_matrix[i, j, x, y] * belief[x, y]
+                    transition_belief += T_matrix[x, y, i, j] * belief[x, y]
 
                 # Update of the belief state
                 updated_belief[i, j] = O_matrix[i, j] * transition_belief
@@ -493,14 +493,15 @@ class PacmanAgent(Agent):
         return closest_ghost, ghost_pos[closest_ghost], ghost_pos
 
     def update_targeted_ghost(self, closest_ghost, closest_ghost_pos,
-                               ghost_pos, eaten):
+                              ghost_pos, eaten):
         """Given the closest ghost at the current step, updates the ghost
         targeted by pacman if a ghost has been closer to pacman for 4
         following steps than its actual targeted.
 
         Arguments:
             closest_ghost: The index of the closest ghost to pacman.
-            closest_ghost_pos: most probable x and y coordinates of the closest ghost.
+            closest_ghost_pos: most probable x and y coordinates of the
+                               closest ghost.
             ghost_pos: The position the closest ghost.
             eaten: A list of booleans indicating which ghosts have been eaten.
 
@@ -662,8 +663,8 @@ class PacmanAgent(Agent):
         return path
 
     def bfs(self, pacman_pos, ghost_pos, walls):
-        """Given a Pacman's position, a ghost estimated position and the layout,
-        returns a list of legal moves to reach the ghost.
+        """Given a Pacman's position, a ghost estimated position and the
+        layout, returns a list of legal moves to reach the ghost.
 
         Arguments:
             pacman_pos: The starting position (x, y) of Pacman
@@ -840,7 +841,7 @@ class PacmanAgent(Agent):
 
         # Update the targeted ghost
         self.update_targeted_ghost(closest_ghost,
-                                    closest_ghost_pos, ghost_pos, eaten)
+                                   closest_ghost_pos, ghost_pos, eaten)
 
         # Perform BFS to find the shortest path to the target ghost
         # path_to_ghost = self.bfs(position, closest_ghost_pos, walls)
