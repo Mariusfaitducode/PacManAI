@@ -146,7 +146,7 @@ def floyd_warshall(walls):
     adjacency_matrix = csr_matrix((data, (W_indices, H_indices)),
                                   shape=(nbr_empty_cells, nbr_empty_cells))
 
-    # Compute shortest paths using sparse Floyd-Warshall
+    # Compute the shortest paths using sparse Floyd-Warshall
     dist = sparse_floyd_warshall(adjacency_matrix,
                                  directed=False, unweighted=True)
 
@@ -167,7 +167,7 @@ class BeliefStateAgent(Agent):
         self.ghost = ghost
 
         # Dictionary associating the ghost type to a specific level of fear
-        # The more affraid the ghost is, the larger the value will be
+        # The more afraid the ghost is, the larger the value will be
         self.ghost_dict = {
             "afraid": 1.0,
             "fearless": 0.0,
@@ -202,10 +202,10 @@ class BeliefStateAgent(Agent):
         # Possible moves for a cell (going [West, East, North, South])
         moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
-        # Defintion of the transition matrix with the provided dimensions
+        # Definition of the transition matrix with the provided dimensions
         T_matrix = np.zeros((W, H, W, H))
 
-        # Probability of the ghost to be affraid is 2^fear_level
+        # Probability of the ghost to be afraid is 2^fear_level
         ghost_fear_prob = 2**self.ghost_dict.get(self.ghost)
 
         # Precompute Manhattan distances from Pacman's position
@@ -239,7 +239,7 @@ class BeliefStateAgent(Agent):
                     if 0 <= x < W and 0 <= y < H and not walls[x][y]:
 
                         # New distance between pacman and the ghost position
-                        # After a potenial move
+                        # After a potential move
                         new_dist = pacman_distances[x, y]
 
                         # If the ghost is afraid, the probability of the ghost
@@ -362,7 +362,7 @@ class BeliefStateAgent(Agent):
 
                     # Verify if the index is not out of the range
                     # And that it is NOT a wall
-                    if (x < 0 or x >= W or y < 0 or y >= H or walls[x][y]):
+                    if x < 0 or x >= W or y < 0 or y >= H or walls[x][y]:
                         continue
 
                     # Compute product of the transition matrix
@@ -421,11 +421,11 @@ class PacmanAgent(Agent):
         self.dist = None
         # Dictionary mapping each cell to its index in the matrix
         self.cell_to_index = None
-        # Index of the targetted ghost
-        self.targetted_ghosts = None
-        # The position of the targetted ghost
-        self.targetted_ghosts_pos = None
-        # Remaining attention time to the actual targetted ghost
+        # Index of the targeted ghost
+        self.targeted_ghosts = None
+        # The position of the targeted ghost
+        self.targeted_ghosts_pos = None
+        # Remaining attention time to the actual targeted ghost
         # while another ghost has be detected closer
         self.attention_durations = None
         # Possible moves
@@ -446,8 +446,9 @@ class PacmanAgent(Agent):
             position: The current position of Pacman.
 
         Returns:
-            A int representing the ghost identification,
-            a int representing a distance.
+            A 3-tuple:
+            - int representing the ghost identification,
+            - int representing a distance.
         """
         # Total nbr of ghosts
         nbr_ghosts = len(eaten)
@@ -466,7 +467,6 @@ class PacmanAgent(Agent):
             # Value of the most probable position
             ghost_pos_belief = 0
 
-            # print("Belief", beliefs[i])
             # Loop over the current ghost belief states
             # Want to look for the most probable ghost position
             # and save the belief and the position
@@ -492,47 +492,49 @@ class PacmanAgent(Agent):
         # and its position
         return closest_ghost, ghost_pos[closest_ghost], ghost_pos
 
-    def update_targetted_ghost(self, closest_ghost, closest_ghost_pos,
+    def update_targeted_ghost(self, closest_ghost, closest_ghost_pos,
                                ghost_pos, eaten):
-        """Given the closest ghost at the current step, update the ghost
-        targetted by pacman if a ghost has been closer to pacman for 4
-        following steps than its actual targetted.
+        """Given the closest ghost at the current step, updates the ghost
+        targeted by pacman if a ghost has been closer to pacman for 4
+        following steps than its actual targeted.
 
         Arguments:
-            closest_gost: The index of the closest ghost to pacman.
+            closest_ghost: The index of the closest ghost to pacman.
+            closest_ghost_pos: most probable x and y coordinates of the closest ghost.
             ghost_pos: The position the closest ghost.
+            eaten: A list of booleans indicating which ghosts have been eaten.
 
         Returns:
             None
         """
-        if self.targetted_ghosts is not None and eaten[self.targetted_ghosts]:
-            self.targetted_ghosts = None
-            self.targetted_ghosts_pos = None
+        if self.targeted_ghosts is not None and eaten[self.targeted_ghosts]:
+            self.targeted_ghosts = None
+            self.targeted_ghosts_pos = None
             self.attention_durations = None
 
         # Identify the first closest ghost
-        if self.targetted_ghosts is None:
-            self.targetted_ghosts = closest_ghost
-            self.targetted_ghosts_pos = ghost_pos
+        if self.targeted_ghosts is None:
+            self.targeted_ghosts = closest_ghost
+            self.targeted_ghosts_pos = ghost_pos
             self.attention_durations = 4
 
-        # If the closest ghost is not the targetted one
-        if self.targetted_ghosts != closest_ghost:
-            # If the attention duration is over, change of targetted_ghosts
+        # If the closest ghost is not the targeted one
+        if self.targeted_ghosts != closest_ghost:
+            # If the attention duration is over, change of targeted_ghosts
             if self.attention_durations == 0:
-                self.targetted_ghosts = closest_ghost
-                self.targetted_ghosts_pos = closest_ghost_pos
+                self.targeted_ghosts = closest_ghost
+                self.targeted_ghosts_pos = closest_ghost_pos
                 self.attention_durations = 4
             # If the attention duration is not over,
-            # decrease the remaining attention durantion for that ghost
+            # decrease the remaining attention duration for that ghost
             else:
                 self.attention_durations -= 1
-                self.targetted_ghosts_pos = ghost_pos[self.targetted_ghosts]
+                self.targeted_ghosts_pos = ghost_pos[self.targeted_ghosts]
         else:
-            # If the closest ghost is the targetted one,
+            # If the closest ghost is the targeted one,
             # reset the attention duration
             self.attention_durations = 4
-            self.targetted_ghosts_pos = ghost_pos[self.targetted_ghosts]
+            self.targeted_ghosts_pos = ghost_pos[self.targeted_ghosts]
 
     def astar(self, pacman_pos, ghost_pos, walls):
         """Given Pacman's position, a ghost estimated position and the layout,
@@ -645,9 +647,9 @@ class PacmanAgent(Agent):
                 ]
 
                 # Calculate the probability density at the new cell
-                density = self.getDensity((current[0], current[1]),
-                                          inc_x, inc_y,
-                                          beliefs[self.targetted_ghosts])
+                density = self.get_density((current[0], current[1]),
+                                           inc_x, inc_y,
+                                           beliefs[self.targeted_ghosts])
                 # Use density to adjust the heuristic
                 adjusted_heuristic = density * 1
 
@@ -660,7 +662,7 @@ class PacmanAgent(Agent):
         return path
 
     def bfs(self, pacman_pos, ghost_pos, walls):
-        """Given a Pacman's position, a ghost etimated position and the layout,
+        """Given a Pacman's position, a ghost estimated position and the layout,
         returns a list of legal moves to reach the ghost.
 
         Arguments:
@@ -707,7 +709,7 @@ class PacmanAgent(Agent):
         # No path found
         return []
 
-    def findOptimalMove(self, pacPos, walls, beliefs):
+    def find_optimal_move(self, pacPos, walls, beliefs):
         """
         Determines the best move for Pacman based on real distance
         the belief about the ghost position.
@@ -716,13 +718,12 @@ class PacmanAgent(Agent):
             pacPos: Pacman's current position.
             walls: The W x H grid of the layout's walls
             beliefs: The list of current ghost belief states.
-            get_density: Function to compute the density in a given direction.
 
         Returns:
-            optimalmove: The optimal move direction
+            The optimal move direction
         """
         x, y = pacPos
-        optimalmove = Directions.STOP
+        optimal_move = Directions.STOP
 
         # Step 1: Compute moves that minimize the real distance
         possible_moves = []
@@ -733,10 +734,12 @@ class PacmanAgent(Agent):
                 continue
 
             new_pos = (x + dx, y + dy)
-            ghost_pos = self.targetted_ghosts_pos
+            ghost_pos = self.targeted_ghosts_pos
 
-            distance = self.dist[self.cell_to_index[tuple(new_pos)],
-                                 self.cell_to_index[tuple(ghost_pos)]]
+            distance = self.dist[
+                self.cell_to_index[tuple(new_pos)],
+                self.cell_to_index[tuple(ghost_pos)]
+            ]
             possible_moves.append((distance, dx, dy, move))
             min_distance = min(min_distance, distance)
 
@@ -756,32 +759,32 @@ class PacmanAgent(Agent):
             if walls[x + dx][y + dy]:
                 continue
 
-            density = self.getDensity(pacPos, dx, dy,
-                                      beliefs[self.targetted_ghosts])
+            density = self.get_density(pacPos, dx, dy,
+                                       beliefs[self.targeted_ghosts])
 
             if density > max_density:
                 max_density = density
-                optimalmove = move
+                optimal_move = move
 
-        return optimalmove
+        return optimal_move
 
-    def getDensity(self, pacPos, dx, dy, belief):
+    def get_density(self, pac_pos, dx, dy, belief):
         """
-       Method computing the probability of finding the targetted ghost in a
+       Method computing the probability of finding the targeted ghost in a
        given direction.
 
         Arguments:
-            pacPos: The current position of Pacman (x, y).
+            pac_pos: The current position of Pacman (x, y).
             dx: The change in the x-coordinate for the move.
             dy: The change in the y-coordinate for the move.
-            beliefs: The list of current ghost belief states.
+            belief: The list of current ghost belief states.
 
         Returns:
             density: The total probability (density) in the
                     direction specified by dx, dy.
         """
         W, H = belief.shape
-        x, y = pacPos
+        x, y = pac_pos
 
         density = 0
 
@@ -807,7 +810,7 @@ class PacmanAgent(Agent):
                 startx = abs(y - j)
                 x_min = max(x - startx, 0)
                 x_max = min(x + startx + 1, W)
-                # Sum the slice of the collumn j of the belief matrix
+                # Sum the slice of the column j of the belief matrix
                 # covering columns from x_min to y_max
                 density += belief[x_min:x_max, j].sum()
 
@@ -833,8 +836,8 @@ class PacmanAgent(Agent):
         closest_ghost, closest_ghost_pos, ghost_pos =\
             self.closest_ghost_positions(beliefs, eaten, position)
 
-        # Update the targetted ghost
-        self.update_targetted_ghost(closest_ghost,
+        # Update the targeted ghost
+        self.update_targeted_ghost(closest_ghost,
                                     closest_ghost_pos, ghost_pos, eaten)
 
         # Perform BFS to find the shortest path to the target ghost
@@ -857,9 +860,9 @@ class PacmanAgent(Agent):
 
         # return Directions.STOP
 
-        optimalMove = self.findOptimalMove(position, walls, beliefs)
+        optimal_move = self.find_optimal_move(position, walls, beliefs)
 
-        return optimalMove
+        return optimal_move
 
     def get_action(self, state):
         """Given a Pacman game state, returns a legal move.
@@ -870,7 +873,7 @@ class PacmanAgent(Agent):
             state: a game state. See API or class `pacman.GameState`.
 
         Returns:
-            A legal move as) defined in `game.Directions`.
+            A legal move as defined in `game.Directions`.
         """
 
         return self._get_action(
