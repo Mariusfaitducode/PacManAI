@@ -710,7 +710,7 @@ class PacmanAgent(Agent):
     def findOptimalMove(self, pacPos, walls, beliefs):
         """
         Determines the best move for Pacman based on real distance
-        the belief about the ghost position.
+        and the belief about the ghost position.
 
         Arguments:
             pacPos: Pacman's current position.
@@ -724,7 +724,7 @@ class PacmanAgent(Agent):
         x, y = pacPos
         optimalmove = Directions.STOP
 
-        # Step 1: Compute moves that minimize the real distance
+        # Compute moves that minimize the real distance to the ghost
         possible_moves = []
         min_distance = np.inf
 
@@ -740,7 +740,7 @@ class PacmanAgent(Agent):
             possible_moves.append((distance, dx, dy, move))
             min_distance = min(min_distance, distance)
 
-        # Filter moves to only those that will decrease the distance to pacman
+        # Keep only the moves that minimize the distance to the ghost
         optimal_moves = [(dx, dy, move) for dist, dx, dy, move
                          in possible_moves if dist == min_distance]
 
@@ -748,17 +748,19 @@ class PacmanAgent(Agent):
             # If only one optimal move exists, return it
             return optimal_moves[0][2]
 
-        # Choose the move with leading to the highest probability
-        # of reaching the targeted ghost
+        # Choose the move leading to the highest probability
+        # of finding the ghost based on the belief
         max_density = - np.inf
 
         for dx, dy, move in optimal_moves:
             if walls[x + dx][y + dy]:
                 continue
 
+            # Compute the density in the direction of the move
             density = self.getDensity(pacPos, dx, dy,
                                       beliefs[self.targetted_ghosts])
 
+            # Look for the move with the highest density
             if density > max_density:
                 max_density = density
                 optimalmove = move
@@ -767,7 +769,7 @@ class PacmanAgent(Agent):
 
     def getDensity(self, pacPos, dx, dy, belief):
         """
-       Method computing the probability of finding the targetted ghost in a
+       Function computing the probability of finding the targetted ghost in a
        given direction.
 
         Arguments:
@@ -778,7 +780,7 @@ class PacmanAgent(Agent):
 
         Returns:
             density: The total probability (density) in the
-                    direction specified by dx, dy.
+                    direction specified by dx and dy.
         """
         W, H = belief.shape
         x, y = pacPos
